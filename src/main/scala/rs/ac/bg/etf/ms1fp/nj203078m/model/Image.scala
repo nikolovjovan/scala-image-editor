@@ -16,6 +16,8 @@ class Image (var fileName: String) {
     this.y = y
   }
 
+  var selectionId: Int = -1
+
   var pixels: Image.PixelMatrix = Array.empty
 
   var x: Int = 0
@@ -23,6 +25,8 @@ class Image (var fileName: String) {
 
   def width: Int = pixels.length
   def height: Int = if (pixels.isEmpty) 0 else pixels(0).length
+
+  def isEmpty: Boolean = width == 0 && height == 0
 
   if (fileName.nonEmpty) readPixelMatrix(fileName)
 
@@ -32,6 +36,34 @@ class Image (var fileName: String) {
       this.fileName = fileName
     case Failure(f) => println(f)
   }
+
+  def op_vector(vec: Image.PixelVector, op: Pixel => Pixel): Image.PixelVector = vec map op
+  def op_matrix(op: Pixel => Pixel): Image.PixelMatrix = pixels map[Image.PixelVector] (op_vector(_, op))
+
+  def image_op(op: Pixel => Pixel): Image = {
+    val img: Image = new Image
+    img.pixels = op_matrix(op)
+    img.x = x
+    img.y = y
+    img
+  }
+
+  def limit(): Image = image_op(x => x.limit())
+  def withLayerAlpha(alpha: Float): Image = if (alpha >= 1.0f) this else image_op(x => x.withLayerAlpha(alpha))
+
+  def log: Image = image_op(x => x.log)
+  def abs: Image = image_op(x => x.abs)
+
+  def +(value: Float): Image = image_op(x => x + value)
+  def -(value: Float): Image = image_op(x => x - value)
+  def -:(value: Float): Image = image_op(x => value - x)
+  def *(value: Float): Image = image_op(x => x * value)
+  def /(value: Float): Image = image_op(x => x / value)
+  def /:(value: Float): Image = image_op(x => value / x)
+  def **(value: Float): Image = image_op(x => x ** value)
+
+  def min(value: Float): Image = image_op(x => x min value)
+  def max(value: Float): Image = image_op(x => x max value)
 }
 
 object Image {

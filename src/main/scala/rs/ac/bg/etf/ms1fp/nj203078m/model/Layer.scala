@@ -2,7 +2,10 @@ package rs.ac.bg.etf.ms1fp.nj203078m.model
 
 import scala.collection.mutable.ArrayBuffer
 
-class Layer (var name: String, var alpha: Float = 1.0f) {
+class Layer (var name: String, var alpha: Float = 1.0f) extends ElementBase {
+  def this() = this("")
+
+  override var id: Int = Layer.getNextId
 
   var visible: Boolean = true
 
@@ -45,5 +48,14 @@ class Layer (var name: String, var alpha: Float = 1.0f) {
         }
     }
     needsRender = false
+  }
+}
+
+object Layer {
+  var gblLayerId: Int = 0
+
+  def getNextId: Int = {
+    gblLayerId += 1
+    gblLayerId - 1
   }
 }
