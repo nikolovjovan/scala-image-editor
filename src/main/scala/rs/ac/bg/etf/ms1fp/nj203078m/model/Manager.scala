@@ -16,6 +16,8 @@ abstract class Manager[T <: ElementBase](nameTemplate: String, new_T: String => 
 
   def apply(index: Int): T = if (index >= 0 && index < elements.size) elements(index) else throw new IndexOutOfBoundsException
 
+  def indices: Range = elements.indices
+  
   def count: Int = elements.size
 
   protected def addNewElement(position: Int = 0): Unit = {

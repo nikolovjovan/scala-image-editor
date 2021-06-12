@@ -1,60 +1,57 @@
 package rs.ac.bg.etf.ms1fp.nj203078m.model
 
-import java.awt.Color
+import scala.collection.immutable.ArraySeq
 
 abstract class Operation (var name: String) {
-  val value: Float
-  def apply(pixel: Pixel): Pixel
+  val N: Int
+  def D: Int = 2 * N + 1
+
+  def execute(image: Image, cx: Int, cy: Int): Pixel
+
   override def toString: String = name
+
+  protected def getInputPixel(image: Image, rx: Int, ry: Int): Pixel =
+    if (rx < 0 || ry < 0 || rx >= image.width || ry >= image.height)
+      Pixel.Empty
+    else
+      image(rx)(ry)
 }
 
-case class FillWith (color: Color) extends Operation ("Fill with " + Pixel.colorToPixel(color)) {
-  override val value: Float = 0.0f
-  override def apply(pixel: Pixel): Pixel = color
+case class Median (N: Int) extends Operation ("Median N = " + N) {
+  require(N > 0, "Median requires at least a filter of dimension (2 * N + 1) = 3!")
+
+  private def median(s: Seq[Float]): Float = {
+    val N = s.size
+    val sorted = s.sortWith(_ < _)
+    if (N % 2 == 0)
+      (sorted(N / 2 - 1) + sorted(N / 2)) / 2.0f
+    else
+      sorted(N / 2)
+  }
+
+  override def execute(image: Image, cx: Int, cy: Int): Pixel =
+    new Pixel(
+      image(cx)(cy).alpha,
+      median(ArraySeq.tabulate(D * D)(i => getInputPixel(image, i / D - N + cx, i % D - N + cy).red)),
+      median(ArraySeq.tabulate(D * D)(i => getInputPixel(image, i / D - N + cx, i % D - N + cy).green)),
+      median(ArraySeq.tabulate(D * D)(i => getInputPixel(image, i / D - N + cx, i % D - N + cy).blue))
+    )
 }
 
-case class Log () extends Operation ("Log") {
-  override val value: Float = 0.0f
-  override def apply(pixel: Pixel): Pixel = pixel.log
-}
+case class WeightedMean (N: Int, weights: Image.PixelMatrix) extends Operation ("Weighted mean N = " + N) {
+  require(N > 0, "Weighted mean requires at least a filter of dimension (2 * N + 1) = 3!")
+  require(weights.length == D && weights(0).length == D, "Weighted mean requires a weight matrix with dimension " + D + "x" + D + "!")
 
-case class Abs () extends Operation ("Abs") {
-  override val value: Float = 0.0f
-  override def apply(pixel: Pixel): Pixel = pixel.abs
-}
-
-case class Add (value: Float) extends Operation ("Add " + value) {
-  override def apply(pixel: Pixel): Pixel = pixel + value
-}
-
-case class SubtractBy (value: Float) extends Operation ("Subtract by " + value) {
-  override def apply(pixel: Pixel): Pixel = pixel - value
-}
-
-case class SubtractFrom (value: Float) extends Operation ("Subtract from " + value) {
-  override def apply(pixel: Pixel): Pixel = value - pixel
-}
-
-case class MultiplyBy (value: Float) extends Operation ("Multiply by " + value) {
-  override def apply(pixel: Pixel): Pixel = pixel * value
-}
-
-case class DivideBy (value: Float) extends Operation ("Divide by " + value) {
-  override def apply(pixel: Pixel): Pixel = pixel / value
-}
-
-case class Divide (value: Float) extends Operation ("Divide " + value) {
-  override def apply(pixel: Pixel): Pixel = value / pixel
-}
-
-case class PowerBy (value: Float) extends Operation ("Power by " + value) {
-  override def apply(pixel: Pixel): Pixel = pixel ** value
-}
-
-case class MinWith (value: Float) extends Operation ("Min with " + value) {
-  override def apply(pixel: Pixel): Pixel = pixel min value
-}
-
-case class MaxWith (value: Float) extends Operation ("Max with " + value) {
-  override def apply(pixel: Pixel): Pixel = pixel max value
+  override def execute(image: Image, cx: Int, cy: Int): Pixel = {
+    var red, green, blue: Float = 0.0f
+    for (x <- 0 until D)
+      for (y <- 0 until D) {
+        val input: Pixel = getInputPixel(image, x - N + cx, y - N + cy) * weights(x)(y)
+        red += input.red
+        green += input.green
+        blue += input.blue
+      }
+    val size: Int = D * D
+    new Pixel(image(cx)(cy).alpha, red / size, green / size, blue / size)
+  }
 }

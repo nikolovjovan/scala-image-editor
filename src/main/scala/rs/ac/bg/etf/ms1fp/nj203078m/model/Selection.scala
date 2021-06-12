@@ -9,8 +9,6 @@ class Selection(var name: String) extends ElementBase {
   override var id: Int = Selection.getNextId
 
   var rects: ArrayBuffer[Rectangle] = new ArrayBuffer[Rectangle]()
-
-  var affectedLayers: ArrayBuffer[Int] = new ArrayBuffer[Int]()
 }
 
 object Selection {
@@ -21,5 +19,5 @@ object Selection {
     gblSelectionId - 1
   }
 
-  val Everything = new Selection
+  val Everything = new Selection("Everything")
 }

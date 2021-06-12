@@ -1,16 +1,19 @@
 package rs.ac.bg.etf.ms1fp.nj203078m.gui
 
-import rs.ac.bg.etf.ms1fp.nj203078m.model.{Abs, Add, Divide, DivideBy, FillWith, Log, MaxWith, MinWith, MultiplyBy, PowerBy, Selection, SubtractBy, SubtractFrom}
+import rs.ac.bg.etf.ms1fp.nj203078m.model._
 
 import java.awt.Color
 import java.io.File
 import java.text.DecimalFormat
-import javax.swing.ListSelectionModel
+import java.util.Scanner
+import javax.swing.event.ChangeEvent
+import javax.swing.{JSpinner, ListSelectionModel, SpinnerNumberModel}
 import javax.swing.filechooser.FileNameExtensionFilter
 import javax.swing.table.AbstractTableModel
 import scala.swing.Swing.{CompoundBorder, EmptyBorder, EmptyIcon, EtchedBorder, TitledBorder}
+import scala.swing.TabbedPane.Page
 import scala.swing.event.{Key, KeyPressed, MouseClicked, TableRowsSelected, ValueChanged}
-import scala.swing.{Action, Alignment, BorderPanel, BoxPanel, Button, ColorChooser, Component, Dimension, FileChooser, FormattedTextField, Frame, Insets, Label, MainFrame, Menu, MenuBar, MenuItem, Orientation, ScrollPane, Separator, SimpleSwingApplication, Slider, SplitPane, Table}
+import scala.swing.{Action, Alignment, BorderPanel, BoxPanel, Button, ColorChooser, Component, Dialog, Dimension, FileChooser, FormattedTextField, Frame, Insets, Label, MainFrame, Menu, MenuBar, MenuItem, Orientation, ScrollPane, Separator, SimpleSwingApplication, Slider, SplitPane, TabbedPane, Table, TextArea}
 
 object Main extends SimpleSwingApplication {
 
@@ -20,11 +23,34 @@ object Main extends SimpleSwingApplication {
 
   var fillColor: Color = Color.BLACK
 
+  var N: Int = 1
+
+  def D: Int = 2 * N + 1
+
+  var layerSelectionContains: Int => Boolean = _ => false
+
   def createHorizontalSplitPane(top: Component, bottom: Component): SplitPane =
     new SplitPane(Orientation.Horizontal, top, bottom) {
       oneTouchExpandable = true
       continuousLayout = true
     }
+
+  def createTableScrollPane(table: Table): ScrollPane = new ScrollPane(table) {
+    xLayoutAlignment = java.awt.Component.CENTER_ALIGNMENT
+    minimumSize = new Dimension(80, 100)
+    preferredSize = new Dimension(80, 100)
+    verticalScrollBarPolicy = ScrollPane.BarPolicy.Always
+    horizontalScrollBarPolicy = ScrollPane.BarPolicy.Never
+    listenTo(mouse.clicks)
+    reactions += {
+      case _: MouseClicked => table.peer.clearSelection()
+    }
+  }
+
+  def createHorizontalBoxPanel(components: Seq[Component]): BoxPanel = new BoxPanel(Orientation.Horizontal) {
+    xLayoutAlignment = java.awt.Component.CENTER_ALIGNMENT
+    contents ++= components
+  }
 
   def top: Frame = new MainFrame {
     title = "Scala Image Editor"
@@ -103,22 +129,22 @@ object Main extends SimpleSwingApplication {
         contents += new WrapPanel(WrapPanel.Alignment.Left)() {
           hGap = 5
           contents += new Button(Action("+") {
-            drawing.selectionManager.execute(Add(value))
+            drawing.selectionManager.execute(layerSelectionContains, Add(value))
           })
           contents += new Button(Action("-") {
-            drawing.selectionManager.execute(SubtractBy(value))
+            drawing.selectionManager.execute(layerSelectionContains, SubtractBy(value))
           })
           contents += new Button(Action("-:") {
-            drawing.selectionManager.execute(SubtractFrom(value))
+            drawing.selectionManager.execute(layerSelectionContains, SubtractFrom(value))
           })
           contents += new Button(Action("*") {
-            drawing.selectionManager.execute(MultiplyBy(value))
+            drawing.selectionManager.execute(layerSelectionContains, MultiplyBy(value))
           })
           contents += new Button(Action("/") {
-            drawing.selectionManager.execute(DivideBy(value))
+            drawing.selectionManager.execute(layerSelectionContains, DivideBy(value))
           })
           contents += new Button(Action("/:") {
-            drawing.selectionManager.execute(Divide(value))
+            drawing.selectionManager.execute(layerSelectionContains, Divide(value))
           })
         }
 
@@ -137,41 +163,35 @@ object Main extends SimpleSwingApplication {
           }
           contents += btnChooseColor
           contents += new Button(Action("fill") {
-            drawing.selectionManager.execute(FillWith(fillColor))
+            drawing.selectionManager.execute(layerSelectionContains, FillWith(fillColor))
           })
         }
 
         contents += new WrapPanel(WrapPanel.Alignment.Left)() {
           hGap = 5
           contents += new Button(Action("pow") {
-            drawing.selectionManager.execute(PowerBy(value))
+            drawing.selectionManager.execute(layerSelectionContains, PowerBy(value))
           })
           contents += new Button(Action("min") {
-            drawing.selectionManager.execute(MinWith(value))
+            drawing.selectionManager.execute(layerSelectionContains, MinWith(value))
           })
           contents += new Button(Action("max") {
-            drawing.selectionManager.execute(MaxWith(value))
+            drawing.selectionManager.execute(layerSelectionContains, MaxWith(value))
           })
           contents += new Button(Action("abs") {
-            drawing.selectionManager.execute(Abs())
+            drawing.selectionManager.execute(layerSelectionContains, Abs())
           })
           contents += new Button(Action("log") {
-            drawing.selectionManager.execute(Log())
+            drawing.selectionManager.execute(layerSelectionContains, Log())
           })
         }
       }
 
       val functions: BoxPanel = new BoxPanel(Orientation.Vertical) {
-        border = CompoundBorder(TitledBorder(EtchedBorder, "Functions"), EmptyBorder(5, 5, 5, 10))
         xLayoutAlignment = java.awt.Component.CENTER_ALIGNMENT
 
-        listenTo(mouse.clicks)
-        reactions += {
-          case _: MouseClicked => tblFunctions.peer.clearSelection()
-        }
-
-        val tblFunctions: Table = new Table {
-          autoResizeMode = Table.AutoResizeMode.AllColumns
+        val table: Table = new Table {
+          autoResizeMode = Table.AutoResizeMode.LastColumn
           peer.setRowSelectionAllowed(true)
           peer.setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
           model = new AbstractTableModel {
@@ -192,65 +212,193 @@ object Main extends SimpleSwingApplication {
           }
           peer.setTableHeader(null)
           rowHeight = 30
-        }
-
-        contents += new ScrollPane(tblFunctions) {
-          xLayoutAlignment = java.awt.Component.CENTER_ALIGNMENT
-          minimumSize = new Dimension(80, 100)
-          preferredSize = new Dimension(80, 100)
-          verticalScrollBarPolicy = ScrollPane.BarPolicy.Always
-          horizontalScrollBarPolicy = ScrollPane.BarPolicy.Never
-          listenTo(mouse.clicks)
+          listenTo(selection)
           reactions += {
-            case _: MouseClicked => tblFunctions.peer.clearSelection()
+            case e: TableRowsSelected => if (e.source == this) {
+              btnRemove.enabled = selection.rows.size > 0 && peer.getSelectedRow != 0 && peer.getSelectedRow != 1
+              btnApply.enabled = selection.rows.size > 0
+            }
           }
         }
 
-        val btnAddFunction = new Button(Action("Add") {
+        listenTo(mouse.clicks)
+        reactions += {
+          case _: MouseClicked => table.peer.clearSelection()
+        }
+
+        contents += createTableScrollPane(table)
+
+        val btnAdd = new Button(Action("Add") {
           drawing.functionManager.addNewFunction()
-          tblFunctions.model.asInstanceOf[AbstractTableModel].fireTableRowsInserted(
+          table.model.asInstanceOf[AbstractTableModel].fireTableRowsInserted(
             drawing.functionManager.count - 1,
             drawing.functionManager.count - 1
           )
-          if (tblFunctions.selection.rows.size == 0) {
-            tblFunctions.peer.setRowSelectionInterval(0, 0)
-            tblFunctions.peer.setColumnSelectionInterval(0, 0)
-            tblFunctions.peer.setEditingRow(0)
-            tblFunctions.peer.setEditingColumn(0)
+          table.peer.setRowSelectionInterval(drawing.functionManager.count - 1, drawing.functionManager.count - 1)
+          table.peer.setColumnSelectionInterval(0, 0)
+          // TODO: Show window for viewing/changing pixel operations with button to save
+        })
+
+        val btnRemove = new Button(Action("Remove") {
+          if (table.selection.rows.size > 0) {
+            drawing.functionManager.removeFunctions(table.selection.rows.contains)
+            table.model.asInstanceOf[AbstractTableModel].fireTableDataChanged()
           }
         })
 
-        val btnRemoveFunction = new Button(Action("Remove") {
-          if (tblFunctions.selection.rows.size > 0) {
-            drawing.functionManager.removeFunctions(tblFunctions.selection.rows.contains)
-            tblFunctions.model.asInstanceOf[AbstractTableModel].fireTableDataChanged()
+        val btnApply = new Button(Action("Apply") {
+          if (table.selection.rows.size > 0) {
+            drawing.selectionManager.execute(layerSelectionContains, drawing.functionManager(table.peer.getSelectedRow))
           }
         })
 
-        val btnApplyFunction = new Button(Action("Apply") {
-          if (tblFunctions.selection.rows.size > 0) {
-            drawing.selectionManager.execute(drawing.functionManager(tblFunctions.peer.getSelectedRow))
+        contents += createHorizontalBoxPanel(Seq(btnAdd, btnRemove, btnApply))
+      }
+
+      val filters: BoxPanel = new BoxPanel(Orientation.Vertical) {
+        xLayoutAlignment = java.awt.Component.CENTER_ALIGNMENT
+
+        contents += new BoxPanel(Orientation.Horizontal) {
+          border = EmptyBorder(5)
+          contents += new Label("N = ") {
+            preferredSize = new Dimension(30, 20)
           }
-        })
+          val spinner: Component = Component.wrap(new JSpinner(new SpinnerNumberModel(N, 1, 50, 1)))
+          spinner.peer.asInstanceOf[JSpinner].addChangeListener(
+            (_: ChangeEvent) => spinner.publish(new ValueChanged(spinner)))
+          spinner.reactions += {
+            case e: ValueChanged => if (e.source == spinner) {
+              N = spinner.peer.asInstanceOf[JSpinner].getValue.asInstanceOf[Int]
+              lblD.text = "D = " + D
+            }
+          }
+          contents += spinner
+          val lblD: Label = new Label("D = " + D) {
+            preferredSize = new Dimension(160, 20)
+            border = EmptyBorder(0, 10, 0, 0)
+          }
+          contents += lblD
+        }
+
+        val txtWeightMatrix: TextArea = new TextArea(
+          "Insert weight matrix here!\n" +
+          "Separate columns with single whitespace,\n" +
+          "separate rows with newline!", D, D)
+
+        contents += new ScrollPane(txtWeightMatrix) {
+          xLayoutAlignment = java.awt.Component.CENTER_ALIGNMENT
+          minimumSize = new Dimension(80, 80)
+          preferredSize = new Dimension(80, 80)
+          verticalScrollBarPolicy = ScrollPane.BarPolicy.AsNeeded
+          horizontalScrollBarPolicy = ScrollPane.BarPolicy.AsNeeded
+        }
 
         contents += new BoxPanel(Orientation.Horizontal) {
           xLayoutAlignment = java.awt.Component.CENTER_ALIGNMENT
-          contents += btnAddFunction
-          contents += btnRemoveFunction
-          contents += btnApplyFunction
+          contents += new Button(Action("Median") {
+            drawing.selectionManager.execute(layerSelectionContains, Median(N))
+          })
+          contents += new Button(Action("Weighted mean") {
+            if (txtWeightMatrix.text.matches(".*[a-zA-Z]+.*"))
+              Dialog.showMessage(this, "Invalid weight matrix!", "Error!", Dialog.Message.Error)
+            val weights: Image.PixelMatrix = new Array[Image.PixelVector](D)
+            for (x <- 0 until D)
+              weights(x) = new Image.PixelVector(D)
+            val scanner: Scanner = new Scanner(txtWeightMatrix.text)
+            try {
+              for (y <- 0 until D)
+                for (x <- 0 until D)
+                  if (!scanner.hasNextFloat) {
+                    Dialog.showMessage(this, "Invalid weight matrix!", "Error!", Dialog.Message.Error)
+                    throw new Exception
+                  } else weights(x)(y) = scanner.nextFloat()
+              drawing.selectionManager.execute(layerSelectionContains, WeightedMean(N, weights))
+            } catch {
+              case _:Exception =>
+            }
+          })
         }
+      }
+
+      val operations: BoxPanel = new BoxPanel(Orientation.Vertical) {
+        xLayoutAlignment = java.awt.Component.CENTER_ALIGNMENT
+
+        val table: Table = new Table {
+          autoResizeMode = Table.AutoResizeMode.LastColumn
+          peer.setRowSelectionAllowed(true)
+          peer.setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
+          model = new AbstractTableModel {
+            override def getRowCount: Int = drawing.operationSeqManager.count
+            override def getColumnCount: Int = 1
+            override def getValueAt(rowIndex: Int, columnIndex: Int): Any = columnIndex match {
+              case _ => drawing.operationSeqManager(rowIndex).name
+            }
+
+            override def isCellEditable(rowIndex: Int, columnIndex: Int): Boolean = true
+
+            override def setValueAt(aValue: Any, rowIndex: Int, columnIndex: Int): Unit = columnIndex match {
+              case 0 =>
+                drawing.operationSeqManager(rowIndex).name = aValue.asInstanceOf[String]
+              case _ =>
+                println("Invalid operation sequence " + rowIndex + " change!")
+            }
+          }
+          peer.setTableHeader(null)
+          rowHeight = 30
+          listenTo(selection)
+          reactions += {
+            case e: TableRowsSelected => if (e.source == this) {
+              btnRemove.enabled = selection.rows.size > 0
+              btnApply.enabled = selection.rows.size > 0
+            }
+          }
+        }
+
+        listenTo(mouse.clicks)
+        reactions += {
+          case _: MouseClicked => table.peer.clearSelection()
+        }
+
+        contents += createTableScrollPane(table)
+
+        val btnAdd = new Button(Action("Add") {
+          drawing.operationSeqManager.addNewOperationSeq()
+          table.model.asInstanceOf[AbstractTableModel].fireTableRowsInserted(
+            drawing.operationSeqManager.count - 1,
+            drawing.operationSeqManager.count - 1
+          )
+          table.peer.setRowSelectionInterval(drawing.operationSeqManager.count - 1, drawing.operationSeqManager.count - 1)
+          table.peer.setColumnSelectionInterval(0, 0)
+          // TODO: Show window for viewing/changing operations with button to save
+        })
+
+        val btnRemove = new Button(Action("Remove") {
+          if (table.selection.rows.size > 0) {
+            drawing.operationSeqManager.removeOperationSeqs(table.selection.rows.contains)
+            table.model.asInstanceOf[AbstractTableModel].fireTableDataChanged()
+          }
+        })
+
+        val btnApply = new Button(Action("Apply") {
+          if (table.selection.rows.size > 0) {
+            drawing.selectionManager.execute(layerSelectionContains, drawing.operationSeqManager(table.peer.getSelectedRow))
+          }
+        })
+
+        contents += createHorizontalBoxPanel(Seq(btnAdd, btnRemove, btnApply))
+      }
+
+      val tpFFO: TabbedPane = new TabbedPane() {
+        pages.addOne(new Page("Functions", functions))
+        pages.addOne(new Page("Filters", filters))
+        pages.addOne(new Page("Operations", operations))
       }
 
       val selections: BoxPanel = new BoxPanel(Orientation.Vertical) {
         border = CompoundBorder(TitledBorder(EtchedBorder, "Selections"), EmptyBorder(5, 5, 5, 10))
         xLayoutAlignment = java.awt.Component.CENTER_ALIGNMENT
 
-        listenTo(mouse.clicks)
-        reactions += {
-          case _: MouseClicked => tblSelections.peer.clearSelection()
-        }
-
-        val tblSelections: Table = new Table {
+        val table: Table = new Table {
           autoResizeMode = Table.AutoResizeMode.AllColumns
           peer.setRowSelectionAllowed(true)
           peer.setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
@@ -272,63 +420,49 @@ object Main extends SimpleSwingApplication {
           }
           peer.setTableHeader(null)
           rowHeight = 30
-
           listenTo(selection)
           reactions += {
-            case e: TableRowsSelected => if (e.source == this)
+            case e: TableRowsSelected => if (e.source == this) {
+              btnRemove.enabled = selection.rows.size > 0
               if (selection.rows.size > 0)
                 drawing.selectionManager.activeSelection =
                   if (selection.rows.size == 1) drawing.selectionManager(peer.getSelectedRow) else Selection.Everything
+            }
           }
         }
 
-        contents += new ScrollPane(tblSelections) {
-          xLayoutAlignment = java.awt.Component.CENTER_ALIGNMENT
-          minimumSize = new Dimension(80, 100)
-          preferredSize = new Dimension(80, 100)
-          verticalScrollBarPolicy = ScrollPane.BarPolicy.Always
-          horizontalScrollBarPolicy = ScrollPane.BarPolicy.Never
-          listenTo(mouse.clicks)
-          reactions += {
-            case _: MouseClicked => tblSelections.peer.clearSelection()
-          }
+        listenTo(mouse.clicks)
+        reactions += {
+          case _: MouseClicked => table.peer.clearSelection()
         }
 
-        val btnAddSelection = new Button(Action("Add") {
+        contents += createTableScrollPane(table)
+
+        val btnAdd = new Button(Action("Add") {
           drawing.selectionManager.addNewSelection()
-          tblSelections.model.asInstanceOf[AbstractTableModel].fireTableRowsInserted(
+          table.model.asInstanceOf[AbstractTableModel].fireTableRowsInserted(
             drawing.selectionManager.count - 1,
             drawing.selectionManager.count - 1
           )
-          if (tblSelections.selection.rows.size == 0) {
-            tblSelections.peer.setRowSelectionInterval(0, 0)
-            tblSelections.peer.setColumnSelectionInterval(0, 0)
-          }
+          table.peer.setRowSelectionInterval(drawing.selectionManager.count - 1, drawing.selectionManager.count - 1)
+          table.peer.setColumnSelectionInterval(0, 0)
+          // TODO: Show window for viewing/changing rectangle selections with button to save
         })
 
-        val btnRemoveSelection = new Button(Action("Remove") {
-          if (tblSelections.selection.rows.size > 0) {
-            drawing.selectionManager.removeSelections(tblSelections.selection.rows.contains)
-            tblSelections.model.asInstanceOf[AbstractTableModel].fireTableDataChanged()
+        val btnRemove = new Button(Action("Remove") {
+          if (table.selection.rows.size > 0) {
+            drawing.selectionManager.removeSelections(table.selection.rows.contains)
+            table.model.asInstanceOf[AbstractTableModel].fireTableDataChanged()
             drawing.render()
           }
         })
 
-        contents += new BoxPanel(Orientation.Horizontal) {
-          xLayoutAlignment = java.awt.Component.CENTER_ALIGNMENT
-          contents += btnAddSelection
-          contents += btnRemoveSelection
-        }
+        contents += createHorizontalBoxPanel(Seq(btnAdd, btnRemove))
       }
 
       val layers: BoxPanel = new BoxPanel(Orientation.Vertical) {
         border = CompoundBorder(TitledBorder(EtchedBorder, "Layers"), EmptyBorder(5, 5, 5, 10))
         xLayoutAlignment = java.awt.Component.CENTER_ALIGNMENT
-
-        listenTo(mouse.clicks)
-        reactions += {
-          case _: MouseClicked => tblLayers.peer.clearSelection()
-        }
 
         val lblOpacity: Label = new Label("100 %", EmptyIcon, Alignment.Right) {
           preferredSize = new Dimension(40, 20)
@@ -344,19 +478,16 @@ object Main extends SimpleSwingApplication {
           reactions += {
             case e: ValueChanged => if (e.source == this) {
               lblOpacity.text = value + " %"
-              for (layerId <- tblLayers.peer.getSelectedRows)
+              for (layerId <- table.peer.getSelectedRows)
                 drawing.layerManager(layerId).alpha = value.toFloat / 100.0f
               drawing.render()
             }
           }
         }
 
-        contents += new BoxPanel(Orientation.Horizontal) {
-          contents += sldOpacity
-          contents += lblOpacity
-        }
+        contents += createHorizontalBoxPanel(Seq(sldOpacity, lblOpacity))
 
-        val tblLayers: Table = new Table {
+        val table: Table = new Table {
           autoResizeMode = Table.AutoResizeMode.AllColumns
           model = new AbstractTableModel {
             override def getRowCount: Int = drawing.layerManager.count
@@ -387,70 +518,62 @@ object Main extends SimpleSwingApplication {
             case e: TableRowsSelected => if (e.source == this) {
               sldOpacity.enabled = selection.rows.size > 0
               lblOpacity.enabled = selection.rows.size > 0
-              btnRemoveLayer.enabled = selection.rows.size > 0
-              btnLoadImage.enabled = selection.rows.size == 1
+              btnRemove.enabled = selection.rows.size > 0
+              btnLoad.enabled = selection.rows.size == 1
               sldOpacity.value = if (selection.rows.size == 1) (drawing.layerManager(peer.getSelectedRow).alpha * 100.0f).toInt else 100
             }
           }
+          layerSelectionContains = selection.rows.contains
         }
 
-        contents += new ScrollPane(tblLayers) {
-          xLayoutAlignment = java.awt.Component.CENTER_ALIGNMENT
-          minimumSize = new Dimension(80, 100)
-          preferredSize = new Dimension(80, 100)
-          verticalScrollBarPolicy = ScrollPane.BarPolicy.Always
-          horizontalScrollBarPolicy = ScrollPane.BarPolicy.Never
-          listenTo(mouse.clicks)
-          reactions += {
-            case _: MouseClicked => tblLayers.peer.clearSelection()
-          }
+        listenTo(mouse.clicks)
+        reactions += {
+          case _: MouseClicked => table.peer.clearSelection()
         }
 
-        val btnAddLayer = new Button(Action("Add") {
-          if (tblLayers.selection.rows.size == 1)
-            drawing.layerManager.addNewLayer(tblLayers.peer.getSelectedRow)
+        contents += createTableScrollPane(table)
+
+        val btnAdd = new Button(Action("Add") {
+          if (table.selection.rows.size == 1)
+            drawing.layerManager.addNewLayer(table.peer.getSelectedRow)
           else
             drawing.layerManager.addNewLayer()
-          tblLayers.model.asInstanceOf[AbstractTableModel].fireTableRowsInserted(
-            drawing.layerManager.count - 1,
-            drawing.layerManager.count - 1)
-          if (tblLayers.selection.rows.size == 0) {
-            tblLayers.peer.setRowSelectionInterval(0, 0)
-            tblLayers.peer.setColumnSelectionInterval(1, 1)
+          table.model.asInstanceOf[AbstractTableModel].fireTableRowsInserted(0, 0)
+          if (table.selection.rows.size == 1) {
+            table.peer.setRowSelectionInterval(table.peer.getSelectedRow - 1, table.peer.getSelectedRow - 1)
+            table.peer.setColumnSelectionInterval(1, 1)
+          } else {
+            table.peer.setRowSelectionInterval(0, 0)
+            table.peer.setColumnSelectionInterval(1, 1)
           }
         })
 
-        val btnRemoveLayer = new Button(Action("Remove") {
-          if (tblLayers.selection.rows.size > 0) {
-            drawing.layerManager.removeLayers(tblLayers.selection.rows.contains)
-            tblLayers.model.asInstanceOf[AbstractTableModel].fireTableDataChanged()
-            tblLayers.peer.setRowSelectionInterval(0, 0)
-            tblLayers.peer.setColumnSelectionInterval(1, 1)
+        val btnRemove = new Button(Action("Remove") {
+          if (table.selection.rows.size > 0) {
+            drawing.layerManager.removeLayers(table.selection.rows.contains)
+            table.model.asInstanceOf[AbstractTableModel].fireTableDataChanged()
+            table.peer.setRowSelectionInterval(0, 0)
+            table.peer.setColumnSelectionInterval(1, 1)
             drawing.render()
           }
         })
 
-        val btnLoadImage = new Button(Action("Load") {
-          if (tblLayers.selection.rows.size == 1) {
+        val btnLoad = new Button(Action("Load") {
+          if (table.selection.rows.size == 1) {
             val chooser = new FileChooser(new File(System.getProperty("user.dir")))
             chooser.peer.removeChoosableFileFilter(chooser.peer.getAcceptAllFileFilter)
             chooser.fileFilter = new FileNameExtensionFilter("Image files (*.png, *.jpg, *.jpeg)", "png", "jpg", "jpeg")
             if (chooser.showOpenDialog(this) == FileChooser.Result.Approve) {
-              drawing.layerManager(tblLayers.selection.rows.leadIndex).loadImage(chooser.selectedFile.getAbsolutePath)
+              drawing.layerManager(table.selection.rows.leadIndex).loadImage(chooser.selectedFile.getAbsolutePath)
               drawing.render()
             }
           }
         })
 
-        contents += new BoxPanel(Orientation.Horizontal) {
-          xLayoutAlignment = java.awt.Component.CENTER_ALIGNMENT
-          contents += btnAddLayer
-          contents += btnRemoveLayer
-          contents += btnLoadImage
-        }
+        contents += createHorizontalBoxPanel(Seq(btnAdd, btnRemove, btnLoad))
       }
 
-      val sideView: SplitPane = createHorizontalSplitPane(functions, createHorizontalSplitPane(selections, layers))
+      val sideView: SplitPane = createHorizontalSplitPane(tpFFO, createHorizontalSplitPane(selections, layers))
 
       val mainView: SplitPane = new SplitPane(Orientation.Vertical, drawingView, sideView) {
         oneTouchExpandable = true
@@ -463,7 +586,6 @@ object Main extends SimpleSwingApplication {
       layout(center) = BorderPanel.Position.Center
     }
     pack()
-//    minimumSize = new Dimension(size.width + 50, size.height)
     minimumSize = size
   }
 }

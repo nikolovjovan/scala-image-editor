@@ -1,6 +1,6 @@
 package rs.ac.bg.etf.ms1fp.nj203078m.gui
 
-import rs.ac.bg.etf.ms1fp.nj203078m.model.{FunctionManager, LayerManager, SelectionManager}
+import rs.ac.bg.etf.ms1fp.nj203078m.model.{FunctionManager, LayerManager, OperationSeqManager, SelectionManager}
 
 import java.awt.Color
 import javax.swing.JViewport
@@ -14,6 +14,7 @@ class Drawing extends Component {
   var layerManager: LayerManager = new LayerManager
   var selectionManager: SelectionManager = new SelectionManager(render, layerManager)
   var functionManager: FunctionManager = new FunctionManager
+  var operationSeqManager: OperationSeqManager = new OperationSeqManager
 
   def render(): Unit = {
     layerManager.render()

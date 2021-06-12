@@ -4,6 +4,7 @@ import rs.ac.bg.etf.ms1fp.nj203078m.interop.ImageConverter
 
 import java.awt.Dimension
 import java.awt.image.BufferedImage
+import scala.annotation.tailrec
 
 class LayerManager extends Manager[Layer]("Layer", name => new Layer(name), true) {
   var output: Image = Image.Empty
@@ -14,12 +15,20 @@ class LayerManager extends Manager[Layer]("Layer", name => new Layer(name), true
   def loadNextFrame: BufferedImage = ImageConverter.imgToBufImg(output)
 
   def render(): Unit = {
-    // TODO: Possibly optimize to render only changes and update final output
-    // TODO: DONE ex. 1: layer(s) becomes invisible -> only output needs changing (blending)
-    // TODO: DONE ex. 2: layer(s) opacity gets changed -> only output needs changing (blending) because layer output is the same only opacity get recalculated
-    // TODO: DONE ex. 3: layer loads image -> only that layer needs rendering and output changing (blending)
-    // TODO: ex. 4: selection updates layer(s) -> only those layers + output changes...
-    // TODO: this can probably be simplified using Layer class when sublayer gets added to set dirty flag...
+
+    @tailrec
+    def doRender(x: Int, y: Int, z: Int = 0): Unit = {
+      if (z < count && output(x)(y).alpha < 1.0f) {
+        if (elements(z).visible && elements(z).alpha > 0) {
+          val xrel: Int = output.x + x - elements(z).output.x
+          val yrel: Int = output.y + y - elements(z).output.y
+          if (xrel >= 0 && xrel < elements(z).output.width &&
+              yrel >= 0 && yrel < elements(z).output.height)
+            output(x)(y) = output(x)(y) over (elements(z).output(xrel)(yrel) withLayerAlpha elements(z).alpha)
+        }
+        doRender(x, y, z + 1)
+      }
+    }
 
     // Render only visible layers -> merge all layer images to one with Z-Buffer.
     //
@@ -31,8 +40,8 @@ class LayerManager extends Manager[Layer]("Layer", name => new Layer(name), true
         output = elements(0).output withLayerAlpha elements(0).alpha
       else
         output = Image.Empty
-      outputSize.width = elements(0).output.width
-      outputSize.height = elements(0).output.height
+      outputSize.width = elements(0).output.x + elements(0).output.width
+      outputSize.height = elements(0).output.y + elements(0).output.height
     } else {
       val sizeRect: Image.Rect = new Image.Rect
       val rect: Image.Rect = new Image.Rect
@@ -49,23 +58,8 @@ class LayerManager extends Manager[Layer]("Layer", name => new Layer(name), true
       if (rect.right > 0 && rect.bottom > 0) {
         output = new Image(rect.width, rect.height, rect.x, rect.y)
         for (x <- 0 until output.width)
-          for (y <- 0 until output.height) {
-            var z: Int = count - 1
-            var break: Boolean = false
-            while (z >= 0 && !break) {
-              if (elements(z).visible && elements(z).alpha > 0) {
-                val xrel: Int = rect.x + x - elements(z).output.x
-                val yrel: Int = rect.y + y - elements(z).output.y
-                if (xrel >= 0 && xrel < elements(z).output.width &&
-                    yrel >= 0 && yrel < elements(z).output.height) {
-                  output.pixels(x)(y) =
-                    elements(z).output.pixels(xrel)(yrel) withLayerAlpha elements(z).alpha over output.pixels(x)(y)
-                  break = output.pixels(x)(y).isOpaqueBlack
-                }
-              }
-              z -= 1
-            }
-          }
+          for (y <- 0 until output.height)
+            doRender(x, y)
       } else output = Image.Empty
       outputSize.width = if (sizeRect.right > 0) sizeRect.right else 0
       outputSize.height = if (sizeRect.bottom > 0) sizeRect.bottom else 0

@@ -7,15 +7,6 @@ import javax.imageio.ImageIO
 import scala.util.{Failure, Success, Try}
 
 class Image (var fileName: String) {
-  def this() = this("")
-
-  def this(width: Int, height: Int, x: Int = 0, y: Int = 0) = {
-    this()
-    pixels = Array.tabulate(width, height)((_, _) => new Pixel())
-    this.x = x
-    this.y = y
-  }
-
   var selectionId: Int = -1
 
   var pixels: Image.PixelMatrix = Array.empty
@@ -23,12 +14,26 @@ class Image (var fileName: String) {
   var x: Int = 0
   var y: Int = 0
 
+  // NOTE: Calling readPixelMatrix(fileName) before var pixels is initialized overrides pixels matrix with empty matrix!
+
+  if (fileName.nonEmpty) readPixelMatrix(fileName)
+
+  def this() = this("")
+
+  def this(width: Int, height: Int, x: Int = 0, y: Int = 0, selectionId: Int = -1) = {
+    this()
+    this.pixels = Array.tabulate(width, height)((_, _) => Pixel.Empty)
+    this.x = x
+    this.y = y
+    this.selectionId = selectionId
+  }
+
   def width: Int = pixels.length
   def height: Int = if (pixels.isEmpty) 0 else pixels(0).length
 
-  def isEmpty: Boolean = width == 0 && height == 0
+  def apply(x: Int): Image.PixelVector = pixels(x)
 
-  if (fileName.nonEmpty) readPixelMatrix(fileName)
+  def isEmpty: Boolean = width == 0 && height == 0
 
   def readPixelMatrix(fileName: String): Unit = Try(ImageIO.read(new File(fileName))) match {
     case Success(image) =>
@@ -37,18 +42,15 @@ class Image (var fileName: String) {
     case Failure(f) => println(f)
   }
 
-  def op_vector(vec: Image.PixelVector, op: Pixel => Pixel): Image.PixelVector = vec map op
-  def op_matrix(op: Pixel => Pixel): Image.PixelMatrix = pixels map[Image.PixelVector] (op_vector(_, op))
-
   def image_op(op: Pixel => Pixel): Image = {
     val img: Image = new Image
-    img.pixels = op_matrix(op)
+    img.pixels = Array.tabulate(width, height)((x, y) => op(pixels(x)(y)))
     img.x = x
     img.y = y
     img
   }
 
-  def limit(): Image = image_op(x => x.limit())
+  def limit: Image = image_op(x => x.limit)
   def withLayerAlpha(alpha: Float): Image = if (alpha >= 1.0f) this else image_op(x => x.withLayerAlpha(alpha))
 
   def log: Image = image_op(x => x.log)

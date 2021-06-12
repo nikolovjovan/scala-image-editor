@@ -8,7 +8,7 @@ class Pixel(val alpha: Float, val red: Float, val green: Float, val blue: Float)
 
   def this(pixel: Pixel) = this(pixel.alpha, pixel.red, pixel.green, pixel.blue)
 
-  def isOpaqueBlack: Boolean = alpha >= 1.0f && red >= 1.0f && green >= 1.0f && blue >= 1.0f
+  def isEmpty: Boolean = this == Pixel.Empty
 
   def limit: Pixel = max(0.0f).min(1.0f)
 
@@ -62,10 +62,12 @@ object Pixel {
       ((argb >> 0) & 0xFF).toFloat / 255)
 
   def toARGB(pixel: Pixel): Int = {
-    val limited = pixel.limit()
+    val limited = pixel.limit
     ((limited.alpha * 255).ceil.toInt << 24) +
     ((limited.red * 255).ceil.toInt << 16) +
     ((limited.green * 255).ceil.toInt << 8) +
     ((limited.blue * 255).ceil.toInt << 0)
   }
+
+  val Empty: Pixel = new Pixel
 }

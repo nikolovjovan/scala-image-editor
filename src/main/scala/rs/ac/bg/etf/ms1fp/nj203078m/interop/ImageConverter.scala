@@ -12,7 +12,7 @@ object ImageConverter {
     if (img.width > 0 && img.height > 0)
       for (x <- 0 until width)
         for (y <- 0 until height)
-          buf.setRGB(x, y, Pixel.toARGB(img.pixels(x)(y)))
+          buf.setRGB(x, y, Pixel.toARGB(img(x)(y)))
     buf
   }
 

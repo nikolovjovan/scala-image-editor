@@ -14,5 +14,6 @@
         </option>
       </SbtProjectSettings>
     </option>
+    <option name="maximumHeapSize" value="4096" />
   </component>
 </project>
