@@ -4,7 +4,6 @@ import rs.ac.bg.etf.ms1fp.nj203078m.model._
 
 import java.awt.Color
 import java.io.File
-import java.text.DecimalFormat
 import java.util.Scanner
 import javax.swing.event.ChangeEvent
 import javax.swing.{JSpinner, ListSelectionModel, SpinnerNumberModel}
@@ -12,8 +11,8 @@ import javax.swing.filechooser.FileNameExtensionFilter
 import javax.swing.table.AbstractTableModel
 import scala.swing.Swing.{CompoundBorder, EmptyBorder, EmptyIcon, EtchedBorder, TitledBorder}
 import scala.swing.TabbedPane.Page
-import scala.swing.event.{Key, KeyPressed, MouseClicked, TableRowsSelected, ValueChanged}
-import scala.swing.{Action, Alignment, BorderPanel, BoxPanel, Button, ColorChooser, Component, Dialog, Dimension, FileChooser, FormattedTextField, Frame, Insets, Label, MainFrame, Menu, MenuBar, MenuItem, Orientation, ScrollPane, Separator, SimpleSwingApplication, Slider, SplitPane, TabbedPane, Table, TextArea}
+import scala.swing.event.{Key, KeyPressed, KeyTyped, MouseClicked, TableRowsSelected, ValueChanged}
+import scala.swing.{Action, Alignment, BorderPanel, BoxPanel, Button, ColorChooser, Component, Dialog, Dimension, FileChooser, Frame, Insets, Label, MainFrame, Menu, MenuBar, MenuItem, Orientation, ScrollPane, Separator, SimpleSwingApplication, Slider, SplitPane, TabbedPane, Table, TextArea, TextField}
 
 object Main extends SimpleSwingApplication {
 
@@ -100,7 +99,7 @@ object Main extends SimpleSwingApplication {
         hGap = 5
         yLayoutAlignment = java.awt.Component.CENTER_ALIGNMENT
 
-        preferredSize = new Dimension(912, 48)
+        preferredSize = new Dimension(990, 48)
         minimumSize = preferredSize
 
         contents += new BoxPanel(Orientation.Horizontal) {
@@ -108,22 +107,44 @@ object Main extends SimpleSwingApplication {
             preferredSize = new Dimension(80, 20)
             border = EmptyBorder(0, 5, 0, 10)
           }
-          contents += new FormattedTextField(new DecimalFormat("#.######")) {
+          val lblValue: Label = new Label(value.toString) {
+            preferredSize = new Dimension(80, 20)
+            border = EmptyBorder(0, 10, 0, 0)
+          }
+          contents += new TextField {
             preferredSize = new Dimension(100, 20)
             maximumSize = preferredSize
+            text = value.toString
+            verifier = _ => false
             listenTo(keys)
-            peer.setValue(value)
             reactions += {
+              case e: KeyTyped => if (e.source == this) {
+                if ((!e.char.isDigit && e.char != '.') || (e.char == '.' && text.contains('.')))
+                  e.consume()
+                try {
+                  if (peer.getSelectionStart == 0 && peer.getSelectionEnd == peer.getText.length)
+                    value = e.char.toString.toFloat
+                  else {
+                    value = (text.substring(0, caret.position) + e.char + text.substring(caret.position)).toFloat
+                    if (text.length > value.toString.length)
+                      text = value.toString
+                  }
+                  lblValue.text = value.toString
+                } catch {
+                  case _: Exception =>
+                }
+              }
               case e: KeyPressed => if (e.source == this) {
                 if (e.key == Key.Enter) {
-                  commitEdit()
-                  value = peer.getValue.asInstanceOf[Double].toFloat
+                  value = text.toFloat
+                  lblValue.text = value.toString
                 }
                 if (e.key == Key.Enter || e.key == Key.Escape)
                   text = value.toString
               }
             }
           }
+          contents += lblValue
         }
 
         contents += new WrapPanel(WrapPanel.Alignment.Left)() {
