@@ -31,7 +31,7 @@ case class Median (N: Int) extends Operation ("Median N = " + N) {
 
   override def execute(image: Image, cx: Int, cy: Int): Pixel =
     new Pixel(
-      image(cx)(cy).alpha,
+      median(ArraySeq.tabulate(D * D)(i => getInputPixel(image, i / D - N + cx, i % D - N + cy).alpha)),
       median(ArraySeq.tabulate(D * D)(i => getInputPixel(image, i / D - N + cx, i % D - N + cy).red)),
       median(ArraySeq.tabulate(D * D)(i => getInputPixel(image, i / D - N + cx, i % D - N + cy).green)),
       median(ArraySeq.tabulate(D * D)(i => getInputPixel(image, i / D - N + cx, i % D - N + cy).blue))

@@ -5,6 +5,7 @@ import rs.ac.bg.etf.ms1fp.nj203078m.interop.ImageConverter
 import java.awt.Dimension
 import java.awt.image.BufferedImage
 import scala.annotation.tailrec
+import scala.swing.Point
 
 class LayerManager extends Manager[Layer]("Layer", name => new Layer(name), true) {
   var output: Image = Image.Empty
@@ -14,16 +15,43 @@ class LayerManager extends Manager[Layer]("Layer", name => new Layer(name), true
 
   def loadNextFrame: BufferedImage = ImageConverter.imgToBufImg(output)
 
+  def getLayerAt(point: Point): Option[Layer] = {
+    class BreakLoop extends Exception
+
+    if (output == Image.Empty)
+      None
+    else {
+      var result: Option[Layer] = None
+      try {
+        for (layer <- elements if layer.visible && layer.alpha > 0.0f) {
+          val xrel: Int = point.x - layer.x
+          val yrel: Int = point.y - layer.y
+          if (xrel >= 0 && xrel < layer.width &&
+              yrel >= 0 && yrel < layer.height &&
+              layer.output(xrel)(yrel).alpha > 0.0f) {
+            result = Some(layer)
+            // Break for loop
+            //
+            throw new BreakLoop
+          }
+        }
+      } catch {
+        case _: BreakLoop =>
+      }
+      result
+    }
+  }
+
   def render(): Unit = {
 
     @tailrec
     def doRender(x: Int, y: Int, z: Int = 0): Unit = {
       if (z < count && output(x)(y).alpha < 1.0f) {
         if (elements(z).visible && elements(z).alpha > 0) {
-          val xrel: Int = output.x + x - elements(z).output.x
-          val yrel: Int = output.y + y - elements(z).output.y
-          if (xrel >= 0 && xrel < elements(z).output.width &&
-              yrel >= 0 && yrel < elements(z).output.height)
+          val xrel: Int = output.x + x - elements(z).x
+          val yrel: Int = output.y + y - elements(z).y
+          if (xrel >= 0 && xrel < elements(z).width &&
+              yrel >= 0 && yrel < elements(z).height)
             output(x)(y) = output(x)(y) over (elements(z).output(xrel)(yrel) withLayerAlpha elements(z).alpha)
         }
         doRender(x, y, z + 1)
@@ -40,8 +68,8 @@ class LayerManager extends Manager[Layer]("Layer", name => new Layer(name), true
         output = elements(0).output withLayerAlpha elements(0).alpha
       else
         output = Image.Empty
-      outputSize.width = elements(0).output.x + elements(0).output.width
-      outputSize.height = elements(0).output.y + elements(0).output.height
+      outputSize.width = elements(0).x + elements(0).width
+      outputSize.height = elements(0).y + elements(0).height
     } else {
       val sizeRect: Image.Rect = new Image.Rect
       val rect: Image.Rect = new Image.Rect

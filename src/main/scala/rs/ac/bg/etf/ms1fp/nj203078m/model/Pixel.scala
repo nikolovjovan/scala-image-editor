@@ -37,7 +37,7 @@ class Pixel(val alpha: Float, val red: Float, val green: Float, val blue: Float)
   def abs: Pixel = unary_op(x => x.abs)
 
   def binary_op(that: Pixel)(op: (Float, Float) => Float): Pixel =
-    new Pixel(this.alpha, op(this.red, that.red), op(this.green, that.green), op(this.blue, that.blue))
+    new Pixel(this.alpha max that.alpha, op(this.red, that.red), op(this.green, that.green), op(this.blue, that.blue))
 
   def +(that: Pixel): Pixel = binary_op(that)((x, y) => x + y)
   def -(that: Pixel): Pixel = binary_op(that)((x, y) => x - y)
@@ -52,7 +52,7 @@ class Pixel(val alpha: Float, val red: Float, val green: Float, val blue: Float)
 }
 
 object Pixel {
-  implicit def floatToPixel(value: Float): Pixel = new Pixel(1.0f, value, value, value)
+  implicit def floatToPixel(value: Float): Pixel = new Pixel(0.0f, value, value, value)
   implicit def colorToPixel(color: Color): Pixel = fromARGB(color.getRGB)
 
   def fromARGB(argb: Int): Pixel =

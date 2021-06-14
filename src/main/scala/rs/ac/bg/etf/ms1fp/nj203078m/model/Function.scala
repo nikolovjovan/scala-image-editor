@@ -11,7 +11,7 @@ case class Function (initialName: String) extends PixelOperation (initialName) w
   override def apply(pixel: Pixel): Pixel = {
     var tmp = pixel
     for (op <- operations)
-      tmp = op.apply(tmp)
+      tmp = op(tmp)
     tmp
   }
 }
