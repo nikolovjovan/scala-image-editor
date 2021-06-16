@@ -1,9 +1,11 @@
 package rs.ac.bg.etf.ms1fp.nj203078m.model
 
-import java.awt.Dimension
+import rs.ac.bg.etf.ms1fp.nj203078m.model.manager.ElementBase
+import rs.ac.bg.etf.ms1fp.nj203078m.model.operation.{Operation, OperationSeq}
+
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
-import scala.swing.Rectangle
+import scala.swing.Dimension
 
 class Layer (var name: String, var alpha: Float = 1.0f) extends ElementBase {
   def this() = this("")
@@ -51,10 +53,10 @@ class Layer (var name: String, var alpha: Float = 1.0f) extends ElementBase {
     } else if (images.size == 1) {
       output = images(0)
     } else {
-      val rect: Image.Rect = new Image.Rect
+      val rect: Rect = new Rect
       for (image <- images)
         Image.updateImageRect(image, rect)
-      output = new Image(rect.width, rect.height, rect.x, rect.y)
+      output = Image.withSize(rect)
       for (x <- 0 until output.width)
         for (y <- 0 until output.height)
           doRender(x, y)
@@ -74,7 +76,16 @@ class Layer (var name: String, var alpha: Float = 1.0f) extends ElementBase {
 
   def execute(selection: Selection, op: Operation, size: Dimension = new Dimension): Unit = {
 
-    def executeOp(rects: ArrayBuffer[Rectangle], in: Image, out: Image, operation: Operation): Image = {
+    def getMaxN(operation: Operation, maxN: Int = 0): Int = {
+      var N: Int = maxN
+      operation match {
+        case seq: OperationSeq => for (op <- seq.operations) N = N max getMaxN(op, N)
+        case op: Operation => N = N max op.N
+      }
+      N
+    }
+
+    def executeOp(rects: ArrayBuffer[Rect], in: Image, out: Image, operation: Operation): Image = {
       for (rect <- rects)
         for (x <- rect.x until rect.x + rect.width)
           for (y <- rect.y until rect.y + rect.height)
@@ -83,7 +94,7 @@ class Layer (var name: String, var alpha: Float = 1.0f) extends ElementBase {
       out
     }
 
-    def executeSeq(rects: ArrayBuffer[Rectangle], in: Image, out: Image, seq: OperationSeq): Image = {
+    def executeSeq(rects: ArrayBuffer[Rect], in: Image, out: Image, seq: OperationSeq): Image = {
       if (seq.operations.isEmpty)
         in
       else {
@@ -110,13 +121,13 @@ class Layer (var name: String, var alpha: Float = 1.0f) extends ElementBase {
       }
     }
 
-    val imageRect: Rectangle = new Rectangle(size)
-    var rects: ArrayBuffer[Rectangle] = selection.rects
+    val imageRect: Rect = new Rect(size)
+    var rects: ArrayBuffer[Rect] = selection.rects
 
     if (selection == Selection.Everything)
-      rects = new ArrayBuffer[Rectangle]().addOne(imageRect)
+      rects = new ArrayBuffer[Rect]().addOne(imageRect)
     else {
-      val tmpRect: Image.Rect = new Image.Rect
+      val tmpRect: Rect = new Rect
 
       for (rect <- selection.rects) {
         if (rect.x < tmpRect.left)
@@ -134,6 +145,17 @@ class Layer (var name: String, var alpha: Float = 1.0f) extends ElementBase {
       imageRect.width = tmpRect.width
       imageRect.height = tmpRect.height
     }
+
+    val maxN: Int = getMaxN(op)
+
+    if (output.x - maxN < imageRect.left)
+      imageRect.left = output.x - maxN
+    if (output.x + output.width + maxN > imageRect.right)
+      imageRect.right = output.x + output.width + maxN
+    if (output.y - maxN < imageRect.top)
+      imageRect.top = output.y - maxN
+    if (output.y + output.height + maxN > imageRect.bottom)
+      imageRect.bottom = output.y + output.height + maxN
 
     // Try to reuse previous sublayer if location and size matches!
     //

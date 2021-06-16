@@ -1,4 +1,7 @@
-package rs.ac.bg.etf.ms1fp.nj203078m.model
+package rs.ac.bg.etf.ms1fp.nj203078m.model.manager
+
+import rs.ac.bg.etf.ms1fp.nj203078m.model.Selection
+import rs.ac.bg.etf.ms1fp.nj203078m.model.operation.Operation
 
 import scala.collection.mutable
 

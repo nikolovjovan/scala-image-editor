@@ -1,11 +1,11 @@
-package rs.ac.bg.etf.ms1fp.nj203078m.model
+package rs.ac.bg.etf.ms1fp.nj203078m.model.manager
 
 import rs.ac.bg.etf.ms1fp.nj203078m.interop.ImageConverter
+import rs.ac.bg.etf.ms1fp.nj203078m.model.{Image, Layer, Rect}
 
-import java.awt.Dimension
 import java.awt.image.BufferedImage
 import scala.annotation.tailrec
-import scala.swing.Point
+import scala.swing.{Dimension, Point}
 
 class LayerManager extends Manager[Layer]("Layer", name => new Layer(name), true) {
   var output: Image = Image.Empty
@@ -71,8 +71,8 @@ class LayerManager extends Manager[Layer]("Layer", name => new Layer(name), true
       outputSize.width = elements(0).x + elements(0).width
       outputSize.height = elements(0).y + elements(0).height
     } else {
-      val sizeRect: Image.Rect = new Image.Rect
-      val rect: Image.Rect = new Image.Rect
+      val sizeRect: Rect = new Rect
+      val rect: Rect = new Rect
       for (layer <- elements) {
         // "rect" is responsible for actual output size, this image will be converted into BufferedImage for drawing.
         //

@@ -1,10 +1,11 @@
 package rs.ac.bg.etf.ms1fp.nj203078m.gui
 
-import rs.ac.bg.etf.ms1fp.nj203078m.model.{FunctionManager, Layer, LayerManager, OperationSeqManager, SelectionManager}
+import rs.ac.bg.etf.ms1fp.nj203078m.model.Layer
+import rs.ac.bg.etf.ms1fp.nj203078m.model.manager.{FunctionManager, LayerManager, OperationSeqManager, SelectionManager}
 
 import java.awt.Color
 import javax.swing.JViewport
-import scala.swing.event.{MousePressed, MouseDragged, MouseReleased}
+import scala.swing.event.{MouseDragged, MousePressed, MouseReleased}
 import scala.swing.{Component, Dimension, Graphics2D, Point, Rectangle}
 
 class Drawing extends Component {

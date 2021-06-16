@@ -1,4 +1,4 @@
-package rs.ac.bg.etf.ms1fp.nj203078m.model
+package rs.ac.bg.etf.ms1fp.nj203078m.model.manager
 
 import java.util.regex.Pattern
 import scala.collection.mutable.ArrayBuffer
@@ -17,8 +17,10 @@ abstract class Manager[T <: ElementBase](nameTemplate: String, new_T: String => 
   def apply(index: Int): T = if (index >= 0 && index < elements.size) elements(index) else throw new IndexOutOfBoundsException
 
   def indices: Range = elements.indices
-  
+
   def count: Int = elements.size
+
+  def last: T = elements.last
 
   protected def addNewElement(position: Int = 0): Unit = {
     val pattern = Pattern.compile("^" + nameTemplate + " (\\d+)$")

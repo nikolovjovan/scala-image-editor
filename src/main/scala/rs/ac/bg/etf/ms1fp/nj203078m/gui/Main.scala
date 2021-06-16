@@ -1,6 +1,7 @@
 package rs.ac.bg.etf.ms1fp.nj203078m.gui
 
 import rs.ac.bg.etf.ms1fp.nj203078m.model._
+import rs.ac.bg.etf.ms1fp.nj203078m.model.operation.{Abs, Add, Divide, DivideBy, FillWith, Log, MaxWith, Median, MinWith, MultiplyBy, Operation, PixelOperation, PowerBy, SubtractBy, SubtractFrom, WeightedMean}
 
 import java.awt.Color
 import java.io.File
@@ -16,6 +17,8 @@ import scala.swing.{Action, Alignment, BorderPanel, BoxPanel, Button, ColorChoos
 
 object Main extends SimpleSwingApplication {
 
+  import DialogType.DialogType
+
   val drawing: Drawing = new Drawing
 
   var value: Float = 0.0f
@@ -25,6 +28,9 @@ object Main extends SimpleSwingApplication {
   var N: Int = 1
 
   def D: Int = 2 * N + 1
+
+  var editingMode: DialogType = DialogType.Function
+  var editingDialog: Option[SequenceDialog] = None
 
   var layerSelectionContains: Int => Boolean = _ => false
 
@@ -49,6 +55,20 @@ object Main extends SimpleSwingApplication {
   def createHorizontalBoxPanel(components: Seq[Component]): BoxPanel = new BoxPanel(Orientation.Horizontal) {
     xLayoutAlignment = java.awt.Component.CENTER_ALIGNMENT
     contents ++= components
+  }
+
+  def executeOrAddOperation(operation: Operation): Unit = {
+    if (editingDialog.isDefined) {
+      editingMode match {
+        case DialogType.Function =>
+          operation match {
+            case pixelOp: PixelOperation => drawing.functionManager.last.operations.addOne(pixelOp)
+            case _ => Dialog.showMessage(top, "Functions can be consisted of pixel operations only!", "Warning!", Dialog.Message.Warning)
+          }
+        case DialogType.Operation => drawing.operationSeqManager.last.operations.addOne(operation)
+      }
+      editingDialog.get.updateTable()
+    } else drawing.selectionManager.execute(layerSelectionContains, operation)
   }
 
   def top: Frame = new MainFrame {
@@ -149,24 +169,12 @@ object Main extends SimpleSwingApplication {
 
         contents += new WrapPanel(WrapPanel.Alignment.Left)() {
           hGap = 5
-          contents += new Button(Action("+") {
-            drawing.selectionManager.execute(layerSelectionContains, Add(value))
-          })
-          contents += new Button(Action("-") {
-            drawing.selectionManager.execute(layerSelectionContains, SubtractBy(value))
-          })
-          contents += new Button(Action("-:") {
-            drawing.selectionManager.execute(layerSelectionContains, SubtractFrom(value))
-          })
-          contents += new Button(Action("*") {
-            drawing.selectionManager.execute(layerSelectionContains, MultiplyBy(value))
-          })
-          contents += new Button(Action("/") {
-            drawing.selectionManager.execute(layerSelectionContains, DivideBy(value))
-          })
-          contents += new Button(Action("/:") {
-            drawing.selectionManager.execute(layerSelectionContains, Divide(value))
-          })
+          contents += new Button(Action("+")(executeOrAddOperation(Add(value))))
+          contents += new Button(Action("-")(executeOrAddOperation(SubtractBy(value))))
+          contents += new Button(Action("-:")(executeOrAddOperation(SubtractFrom(value))))
+          contents += new Button(Action("*")(executeOrAddOperation(MultiplyBy(value))))
+          contents += new Button(Action("/")(executeOrAddOperation(DivideBy(value))))
+          contents += new Button(Action("/:")(executeOrAddOperation(Divide(value))))
         }
 
         contents += new WrapPanel(WrapPanel.Alignment.Left)() {
@@ -183,28 +191,16 @@ object Main extends SimpleSwingApplication {
             margin = new Insets(0, 2, 4, 3)
           }
           contents += btnChooseColor
-          contents += new Button(Action("fill") {
-            drawing.selectionManager.execute(layerSelectionContains, FillWith(fillColor))
-          })
+          contents += new Button(Action("fill")(executeOrAddOperation(FillWith(fillColor))))
         }
 
         contents += new WrapPanel(WrapPanel.Alignment.Left)() {
           hGap = 5
-          contents += new Button(Action("pow") {
-            drawing.selectionManager.execute(layerSelectionContains, PowerBy(value))
-          })
-          contents += new Button(Action("min") {
-            drawing.selectionManager.execute(layerSelectionContains, MinWith(value))
-          })
-          contents += new Button(Action("max") {
-            drawing.selectionManager.execute(layerSelectionContains, MaxWith(value))
-          })
-          contents += new Button(Action("abs") {
-            drawing.selectionManager.execute(layerSelectionContains, Abs())
-          })
-          contents += new Button(Action("log") {
-            drawing.selectionManager.execute(layerSelectionContains, Log())
-          })
+          contents += new Button(Action("pow")(executeOrAddOperation(PowerBy(value))))
+          contents += new Button(Action("min")(executeOrAddOperation(MinWith(value))))
+          contents += new Button(Action("max")(executeOrAddOperation(MaxWith(value))))
+          contents += new Button(Action("abs")(executeOrAddOperation(Abs())))
+          contents += new Button(Action("log")(executeOrAddOperation(Log())))
         }
       }
 
@@ -233,11 +229,32 @@ object Main extends SimpleSwingApplication {
           }
           peer.setTableHeader(null)
           rowHeight = 30
-          listenTo(selection)
+          listenTo(selection, mouse.clicks)
           reactions += {
             case e: TableRowsSelected => if (e.source == this) {
               btnRemove.enabled = selection.rows.size > 0 && peer.getSelectedRow != 0 && peer.getSelectedRow != 1
               btnApply.enabled = selection.rows.size > 0
+            }
+            case e: MouseClicked => if (e.source == this && e.modifiers == Key.Modifier.Control && selection.rows.size > 0) {
+              val viewFunctionTableModel = new AbstractTableModel {
+                override def getRowCount: Int = drawing.functionManager(peer.getSelectedRow).operations.size
+
+                override def getColumnCount: Int = 1
+
+                override def getValueAt(rowIndex: Int, columnIndex: Int): Any = columnIndex match {
+                  case _ => drawing.functionManager(peer.getSelectedRow).operations(rowIndex).name
+                }
+
+                override def isCellEditable(rowIndex: Int, columnIndex: Int): Boolean = false
+
+                override def setValueAt(aValue: Any, rowIndex: Int, columnIndex: Int): Unit = {}
+              }
+              val viewFunctionDialog = new SequenceDialog(
+                top,
+                DialogType.Function,
+                drawing.functionManager(peer.getSelectedRow).name,
+                viewFunctionTableModel)
+              viewFunctionDialog.visible = true
             }
           }
         }
@@ -257,7 +274,31 @@ object Main extends SimpleSwingApplication {
           )
           table.peer.setRowSelectionInterval(drawing.functionManager.count - 1, drawing.functionManager.count - 1)
           table.peer.setColumnSelectionInterval(0, 0)
-          // TODO: Show window for viewing/changing pixel operations with button to save
+          val newFunctionTableModel = new AbstractTableModel {
+            override def getRowCount: Int = drawing.functionManager.last.operations.size
+            override def getColumnCount: Int = 1
+            override def getValueAt(rowIndex: Int, columnIndex: Int): Any = columnIndex match {
+              case _ => drawing.functionManager.last.operations(rowIndex).name
+            }
+
+            override def isCellEditable(rowIndex: Int, columnIndex: Int): Boolean = false
+
+            override def setValueAt(aValue: Any, rowIndex: Int, columnIndex: Int): Unit = {}
+          }
+          editingMode = DialogType.Function
+          editingDialog = Some(new SequenceDialog(
+            top,
+            DialogType.Function,
+            drawing.functionManager.last.name,
+            newFunctionTableModel,
+            true,
+            newName => {
+              drawing.functionManager.last.name = newName
+              table.model.asInstanceOf[AbstractTableModel].fireTableDataChanged()
+            },
+            selectionContains => drawing.functionManager.last.removeOperations(selectionContains),
+            _ => editingDialog = None))
+          editingDialog.get.visible = true
         })
 
         val btnRemove = new Button(Action("Remove") {
@@ -268,9 +309,8 @@ object Main extends SimpleSwingApplication {
         })
 
         val btnApply = new Button(Action("Apply") {
-          if (table.selection.rows.size > 0) {
-            drawing.selectionManager.execute(layerSelectionContains, drawing.functionManager(table.peer.getSelectedRow))
-          }
+          if (table.selection.rows.size > 0)
+            executeOrAddOperation(drawing.functionManager(table.peer.getSelectedRow))
         })
 
         contents += createHorizontalBoxPanel(Seq(btnAdd, btnRemove, btnApply))
@@ -316,9 +356,7 @@ object Main extends SimpleSwingApplication {
 
         contents += new BoxPanel(Orientation.Horizontal) {
           xLayoutAlignment = java.awt.Component.CENTER_ALIGNMENT
-          contents += new Button(Action("Median") {
-            drawing.selectionManager.execute(layerSelectionContains, Median(N))
-          })
+          contents += new Button(Action("Median")(executeOrAddOperation(Median(N))))
           contents += new Button(Action("Weighted mean") {
             if (txtWeightMatrix.text.matches(".*[a-zA-Z]+.*"))
               Dialog.showMessage(this, "Invalid weight matrix!", "Error!", Dialog.Message.Error)
@@ -366,11 +404,32 @@ object Main extends SimpleSwingApplication {
           }
           peer.setTableHeader(null)
           rowHeight = 30
-          listenTo(selection)
+          listenTo(selection, mouse.clicks)
           reactions += {
             case e: TableRowsSelected => if (e.source == this) {
               btnRemove.enabled = selection.rows.size > 0
               btnApply.enabled = selection.rows.size > 0
+            }
+            case e: MouseClicked => if (e.source == this && e.modifiers == Key.Modifier.Control && selection.rows.size > 0) {
+              val viewOperationSeqTableModel = new AbstractTableModel {
+                override def getRowCount: Int = drawing.operationSeqManager(peer.getSelectedRow).operations.size
+
+                override def getColumnCount: Int = 1
+
+                override def getValueAt(rowIndex: Int, columnIndex: Int): Any = columnIndex match {
+                  case _ => drawing.operationSeqManager(peer.getSelectedRow).operations(rowIndex).name
+                }
+
+                override def isCellEditable(rowIndex: Int, columnIndex: Int): Boolean = false
+
+                override def setValueAt(aValue: Any, rowIndex: Int, columnIndex: Int): Unit = {}
+              }
+              val viewOperationSeqDialog = new SequenceDialog(
+                top,
+                DialogType.Operation,
+                drawing.operationSeqManager(peer.getSelectedRow).name,
+                viewOperationSeqTableModel)
+              viewOperationSeqDialog.visible = true
             }
           }
         }
@@ -390,7 +449,31 @@ object Main extends SimpleSwingApplication {
           )
           table.peer.setRowSelectionInterval(drawing.operationSeqManager.count - 1, drawing.operationSeqManager.count - 1)
           table.peer.setColumnSelectionInterval(0, 0)
-          // TODO: Show window for viewing/changing operations with button to save
+          val newOperationSeqTableModel = new AbstractTableModel {
+            override def getRowCount: Int = drawing.operationSeqManager.last.operations.size
+            override def getColumnCount: Int = 1
+            override def getValueAt(rowIndex: Int, columnIndex: Int): Any = columnIndex match {
+              case _ => drawing.operationSeqManager.last.operations(rowIndex).name
+            }
+
+            override def isCellEditable(rowIndex: Int, columnIndex: Int): Boolean = false
+
+            override def setValueAt(aValue: Any, rowIndex: Int, columnIndex: Int): Unit = {}
+          }
+          editingMode = DialogType.Operation
+          editingDialog = Some(new SequenceDialog(
+            top,
+            DialogType.Operation,
+            drawing.operationSeqManager.last.name,
+            newOperationSeqTableModel,
+            true,
+            newName => {
+              drawing.operationSeqManager.last.name = newName
+              table.model.asInstanceOf[AbstractTableModel].fireTableDataChanged()
+            },
+            selectionContains => drawing.operationSeqManager.last.removeOperations(selectionContains),
+            _ => editingDialog = None))
+          editingDialog.get.visible = true
         })
 
         val btnRemove = new Button(Action("Remove") {
@@ -401,9 +484,8 @@ object Main extends SimpleSwingApplication {
         })
 
         val btnApply = new Button(Action("Apply") {
-          if (table.selection.rows.size > 0) {
-            drawing.selectionManager.execute(layerSelectionContains, drawing.operationSeqManager(table.peer.getSelectedRow))
-          }
+          if (table.selection.rows.size > 0)
+            executeOrAddOperation(drawing.operationSeqManager(table.peer.getSelectedRow))
         })
 
         contents += createHorizontalBoxPanel(Seq(btnAdd, btnRemove, btnApply))
@@ -441,13 +523,34 @@ object Main extends SimpleSwingApplication {
           }
           peer.setTableHeader(null)
           rowHeight = 30
-          listenTo(selection)
+          listenTo(selection, mouse.clicks)
           reactions += {
             case e: TableRowsSelected => if (e.source == this) {
               btnRemove.enabled = selection.rows.size > 0
               if (selection.rows.size > 0)
                 drawing.selectionManager.activeSelection =
                   if (selection.rows.size == 1) drawing.selectionManager(peer.getSelectedRow) else Selection.Everything
+            }
+            case e: MouseClicked => if (e.source == this && e.modifiers == Key.Modifier.Control && selection.rows.size > 0) {
+              val viewSelectionTableModel = new AbstractTableModel {
+                override def getRowCount: Int = drawing.selectionManager(peer.getSelectedRow).rects.size
+
+                override def getColumnCount: Int = 1
+
+                override def getValueAt(rowIndex: Int, columnIndex: Int): Any = columnIndex match {
+                  case _ => drawing.selectionManager(peer.getSelectedRow).rects(rowIndex).toString
+                }
+
+                override def isCellEditable(rowIndex: Int, columnIndex: Int): Boolean = false
+
+                override def setValueAt(aValue: Any, rowIndex: Int, columnIndex: Int): Unit = {}
+              }
+              val viewSelectionDialog = new SequenceDialog(
+                top,
+                DialogType.Selection,
+                drawing.selectionManager(peer.getSelectedRow).name,
+                viewSelectionTableModel)
+              viewSelectionDialog.visible = true
             }
           }
         }
@@ -467,7 +570,31 @@ object Main extends SimpleSwingApplication {
           )
           table.peer.setRowSelectionInterval(drawing.selectionManager.count - 1, drawing.selectionManager.count - 1)
           table.peer.setColumnSelectionInterval(0, 0)
-          // TODO: Show window for viewing/changing rectangle selections with button to save
+          val newSelectionTableModel = new AbstractTableModel {
+            override def getRowCount: Int = drawing.selectionManager.last.rects.size
+            override def getColumnCount: Int = 1
+            override def getValueAt(rowIndex: Int, columnIndex: Int): Any = columnIndex match {
+              case _ => drawing.selectionManager.last.rects(rowIndex).toString
+            }
+
+            override def isCellEditable(rowIndex: Int, columnIndex: Int): Boolean = false
+
+            override def setValueAt(aValue: Any, rowIndex: Int, columnIndex: Int): Unit = {}
+          }
+          editingMode = DialogType.Selection
+          editingDialog = Some(new SequenceDialog(
+            top,
+            DialogType.Selection,
+            drawing.selectionManager.last.name,
+            newSelectionTableModel,
+            true,
+            newName => {
+              drawing.selectionManager.last.name = newName
+              table.model.asInstanceOf[AbstractTableModel].fireTableDataChanged()
+            },
+            selectionContains => drawing.selectionManager.last.removeRects(selectionContains),
+            _ => editingDialog = None))
+          editingDialog.get.visible = true
         })
 
         val btnRemove = new Button(Action("Remove") {
@@ -606,6 +733,7 @@ object Main extends SimpleSwingApplication {
 
       layout(center) = BorderPanel.Position.Center
     }
+
     pack()
     minimumSize = size
   }

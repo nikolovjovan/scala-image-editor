@@ -1,4 +1,6 @@
-package rs.ac.bg.etf.ms1fp.nj203078m.model
+package rs.ac.bg.etf.ms1fp.nj203078m.model.operation
+
+import rs.ac.bg.etf.ms1fp.nj203078m.model.{Image, Pixel}
 
 import java.awt.Color
 

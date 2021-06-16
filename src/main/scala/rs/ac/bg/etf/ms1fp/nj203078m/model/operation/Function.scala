@@ -1,4 +1,7 @@
-package rs.ac.bg.etf.ms1fp.nj203078m.model
+package rs.ac.bg.etf.ms1fp.nj203078m.model.operation
+
+import rs.ac.bg.etf.ms1fp.nj203078m.model.Pixel
+import rs.ac.bg.etf.ms1fp.nj203078m.model.manager.ElementBase
 
 import scala.collection.mutable.ListBuffer
 
@@ -6,7 +9,15 @@ case class Function (initialName: String) extends PixelOperation (initialName) w
   override val value: Float = 0.0f
   override var id: Int = Function.getNextId
 
-  val operations: ListBuffer[PixelOperation] = new ListBuffer[PixelOperation]
+  var operations: ListBuffer[PixelOperation] = new ListBuffer[PixelOperation]
+
+  def removeOperations(selectionContains: Int => Boolean): Unit = {
+    val tmp = operations
+    operations = new ListBuffer[PixelOperation]
+    for (i <- tmp.indices)
+      if (!selectionContains(i))
+        operations += tmp(i)
+  }
 
   override def apply(pixel: Pixel): Pixel = {
     var tmp = pixel

@@ -20,7 +20,7 @@ class Image (var fileName: String) {
 
   def this() = this("")
 
-  def this(width: Int, height: Int, x: Int = 0, y: Int = 0, selectionId: Int = -1) = {
+  def this(width: Int, height: Int, x: Int = 0, y: Int = 0, selectionId: Int = -1) {
     this()
     this.pixels = Array.tabulate(width, height)((_, _) => Pixel.Empty)
     this.x = x
@@ -74,19 +74,9 @@ object Image {
 
   val Empty = new Image
 
-  class Rect {
-    var left: Int = Int.MaxValue
-    var top: Int = Int.MaxValue
-    var right: Int = Int.MinValue
-    var bottom: Int = Int.MinValue
+  def withSize(rect: Rect, selectionId: Int = -1) = new Image(rect.width, rect.height, rect.x, rect.y, selectionId)
 
-    def x: Int = left
-    def y: Int = top
-    def width: Int = right - left
-    def height: Int = bottom - top
-  }
-
-  def updateImageRect(img: Image, rect: => Rect): Unit = {
+  def updateImageRect(img: Image, rect: Rect): Unit = {
     if (img.x < rect.left)
       rect.left = img.x
     if (img.x + img.width > rect.right)

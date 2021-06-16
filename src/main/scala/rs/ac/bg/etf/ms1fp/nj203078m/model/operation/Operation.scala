@@ -1,4 +1,6 @@
-package rs.ac.bg.etf.ms1fp.nj203078m.model
+package rs.ac.bg.etf.ms1fp.nj203078m.model.operation
+
+import rs.ac.bg.etf.ms1fp.nj203078m.model.{Image, Pixel}
 
 import scala.collection.immutable.ArraySeq
 
@@ -38,7 +40,7 @@ case class Median (N: Int) extends Operation ("Median N = " + N) {
     )
 }
 
-case class WeightedMean (N: Int, weights: Image.PixelMatrix) extends Operation ("Weighted mean N = " + N) {
+case class WeightedMean (N: Int, weights: Image.PixelMatrix) extends Operation ("Weighted mean N = " + N + " weights: " + weights.mkString("[", ", ", "]")) {
   require(N > 0, "Weighted mean requires at least a filter of dimension (2 * N + 1) = 3!")
   require(weights.length == D && weights(0).length == D, "Weighted mean requires a weight matrix with dimension " + D + "x" + D + "!")
 

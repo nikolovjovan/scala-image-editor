@@ -1,4 +1,6 @@
-package rs.ac.bg.etf.ms1fp.nj203078m.model
+package rs.ac.bg.etf.ms1fp.nj203078m.model.manager
+
+import rs.ac.bg.etf.ms1fp.nj203078m.model.operation.Function
 
 class FunctionManager extends Manager[Function]("Function", name => new Function(name)) {
   elements.addOne(Function.Inverse)
