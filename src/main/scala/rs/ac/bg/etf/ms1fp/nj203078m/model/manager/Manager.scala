@@ -1,12 +1,9 @@
 package rs.ac.bg.etf.ms1fp.nj203078m.model.manager
 
+import rs.ac.bg.etf.ms1fp.nj203078m.model.traits.ElementBase
+
 import java.util.regex.Pattern
 import scala.collection.mutable.ArrayBuffer
-
-trait ElementBase {
-  var name: String
-  var id: Int
-}
 
 // TODO: Look into TypeTag...
 //
@@ -22,7 +19,7 @@ abstract class Manager[T <: ElementBase](nameTemplate: String, new_T: String => 
 
   def last: T = elements.last
 
-  protected def addNewElement(position: Int = 0): Unit = {
+  protected def addElement(position: Int = 0): Unit = {
     val pattern = Pattern.compile("^" + nameTemplate + " (\\d+)$")
     var nextIndex = 1
     for (element <- elements) {

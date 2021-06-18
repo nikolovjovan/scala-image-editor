@@ -9,7 +9,6 @@ abstract class PixelOperation (opName: String) extends Operation (opName) {
   override def execute(image: Image, cx: Int, cy: Int): Pixel = apply(getInputPixel(image, cx, cy))
   val value: Float
   def apply(pixel: Pixel): Pixel
-  override def toString: String = name
 }
 
 case class FillWith (color: Color) extends PixelOperation ("Fill with " + Pixel.colorToPixel(color)) {

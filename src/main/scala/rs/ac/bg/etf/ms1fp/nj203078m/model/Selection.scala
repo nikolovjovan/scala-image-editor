@@ -1,24 +1,15 @@
 package rs.ac.bg.etf.ms1fp.nj203078m.model
 
-import rs.ac.bg.etf.ms1fp.nj203078m.model.manager.ElementBase
-import rs.ac.bg.etf.ms1fp.nj203078m.model.operation.Operation
+import rs.ac.bg.etf.ms1fp.nj203078m.model.traits.Sequence
 
-import scala.collection.mutable.{ArrayBuffer, ListBuffer}
+import scala.collection.mutable.ArrayBuffer
 
-class Selection(var name: String) extends ElementBase {
-  def this() = this("")
-
+class Selection(var name: String) extends Sequence[Rect] {
   override var id: Int = Selection.getNextId
 
-  var rects: ArrayBuffer[Rect] = new ArrayBuffer[Rect]()
-
-  def removeRects(selectionContains: Int => Boolean): Unit = {
-    val tmp = rects
-    rects = new ArrayBuffer[Rect]
-    for (i <- tmp.indices)
-      if (!selectionContains(i))
-        rects += tmp(i)
-  }
+  def rects: ArrayBuffer[Rect] = components
+  def addRect(rect: Rect, position: Int = count): Unit = addComponent(rect, position)
+  def removeRects(selectionContains: Int => Boolean): Unit = removeComponents(selectionContains)
 }
 
 object Selection {

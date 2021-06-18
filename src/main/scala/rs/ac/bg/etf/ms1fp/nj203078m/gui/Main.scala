@@ -2,6 +2,7 @@ package rs.ac.bg.etf.ms1fp.nj203078m.gui
 
 import rs.ac.bg.etf.ms1fp.nj203078m.model._
 import rs.ac.bg.etf.ms1fp.nj203078m.model.operation.{Abs, Add, Divide, DivideBy, FillWith, Log, MaxWith, Median, MinWith, MultiplyBy, Operation, PixelOperation, PowerBy, SubtractBy, SubtractFrom, WeightedMean}
+import rs.ac.bg.etf.ms1fp.nj203078m.model.traits.Sequence
 
 import java.awt.Color
 import java.io.File
@@ -10,6 +11,7 @@ import javax.swing.event.ChangeEvent
 import javax.swing.{JSpinner, ListSelectionModel, SpinnerNumberModel}
 import javax.swing.filechooser.FileNameExtensionFilter
 import javax.swing.table.AbstractTableModel
+import scala.collection.mutable.ArrayBuffer
 import scala.swing.Swing.{CompoundBorder, EmptyBorder, EmptyIcon, EtchedBorder, TitledBorder}
 import scala.swing.TabbedPane.Page
 import scala.swing.event.{Key, KeyPressed, KeyTyped, MouseClicked, TableRowsSelected, ValueChanged}
@@ -71,7 +73,22 @@ object Main extends SimpleSwingApplication {
     } else drawing.selectionManager.execute(layerSelectionContains, operation)
   }
 
-  def top: Frame = new MainFrame {
+  val toggleableButtons: ArrayBuffer[Button] = new ArrayBuffer[Button]()
+
+  def toggleButtons(): Unit = {
+    for (btn <- toggleableButtons)
+      btn.enabled = !btn.enabled
+  }
+
+  def stopEditing(updateTable: Table): Unit = {
+    editingDialog = None
+    toggleButtons()
+    updateTable.model.asInstanceOf[AbstractTableModel].fireTableDataChanged()
+  }
+
+  override def top: Frame = frame
+
+  val frame: Frame = new MainFrame {
     title = "Scala Image Editor"
 
     menuBar = new MenuBar {
@@ -214,12 +231,8 @@ object Main extends SimpleSwingApplication {
           model = new AbstractTableModel {
             override def getRowCount: Int = drawing.functionManager.count
             override def getColumnCount: Int = 1
-            override def getValueAt(rowIndex: Int, columnIndex: Int): Any = columnIndex match {
-              case _ => drawing.functionManager(rowIndex).name
-            }
-
+            override def getValueAt(rowIndex: Int, columnIndex: Int): Any = drawing.functionManager(rowIndex).name
             override def isCellEditable(rowIndex: Int, columnIndex: Int): Boolean = true
-
             override def setValueAt(aValue: Any, rowIndex: Int, columnIndex: Int): Unit = columnIndex match {
               case 0 =>
                 drawing.functionManager(rowIndex).name = aValue.asInstanceOf[String]
@@ -235,27 +248,12 @@ object Main extends SimpleSwingApplication {
               btnRemove.enabled = selection.rows.size > 0 && peer.getSelectedRow != 0 && peer.getSelectedRow != 1
               btnApply.enabled = selection.rows.size > 0
             }
-            case e: MouseClicked => if (e.source == this && e.modifiers == Key.Modifier.Control && selection.rows.size > 0) {
-              val viewFunctionTableModel = new AbstractTableModel {
-                override def getRowCount: Int = drawing.functionManager(peer.getSelectedRow).operations.size
-
-                override def getColumnCount: Int = 1
-
-                override def getValueAt(rowIndex: Int, columnIndex: Int): Any = columnIndex match {
-                  case _ => drawing.functionManager(peer.getSelectedRow).operations(rowIndex).name
-                }
-
-                override def isCellEditable(rowIndex: Int, columnIndex: Int): Boolean = false
-
-                override def setValueAt(aValue: Any, rowIndex: Int, columnIndex: Int): Unit = {}
-              }
-              val viewFunctionDialog = new SequenceDialog(
+            case e: MouseClicked => if (e.source == this && e.modifiers == Key.Modifier.Control && selection.rows.size > 0)
+              new SequenceDialog(
                 top,
                 DialogType.Function,
-                drawing.functionManager(peer.getSelectedRow).name,
-                viewFunctionTableModel)
-              viewFunctionDialog.visible = true
-            }
+                drawing.functionManager(peer.getSelectedRow).asInstanceOf[Sequence[Any]]
+              ).visible = true
           }
         }
 
@@ -267,39 +265,24 @@ object Main extends SimpleSwingApplication {
         contents += createTableScrollPane(table)
 
         val btnAdd = new Button(Action("Add") {
-          drawing.functionManager.addNewFunction()
+          drawing.functionManager.addFunction()
           table.model.asInstanceOf[AbstractTableModel].fireTableRowsInserted(
             drawing.functionManager.count - 1,
             drawing.functionManager.count - 1
           )
           table.peer.setRowSelectionInterval(drawing.functionManager.count - 1, drawing.functionManager.count - 1)
           table.peer.setColumnSelectionInterval(0, 0)
-          val newFunctionTableModel = new AbstractTableModel {
-            override def getRowCount: Int = drawing.functionManager.last.operations.size
-            override def getColumnCount: Int = 1
-            override def getValueAt(rowIndex: Int, columnIndex: Int): Any = columnIndex match {
-              case _ => drawing.functionManager.last.operations(rowIndex).name
-            }
-
-            override def isCellEditable(rowIndex: Int, columnIndex: Int): Boolean = false
-
-            override def setValueAt(aValue: Any, rowIndex: Int, columnIndex: Int): Unit = {}
-          }
+          toggleButtons()
           editingMode = DialogType.Function
           editingDialog = Some(new SequenceDialog(
             top,
             DialogType.Function,
-            drawing.functionManager.last.name,
-            newFunctionTableModel,
+            drawing.functionManager.last.asInstanceOf[Sequence[Any]],
             true,
-            newName => {
-              drawing.functionManager.last.name = newName
-              table.model.asInstanceOf[AbstractTableModel].fireTableDataChanged()
-            },
-            selectionContains => drawing.functionManager.last.removeOperations(selectionContains),
-            _ => editingDialog = None))
+            _ => stopEditing(table)))
           editingDialog.get.visible = true
         })
+        toggleableButtons.addOne(btnAdd)
 
         val btnRemove = new Button(Action("Remove") {
           if (table.selection.rows.size > 0) {
@@ -307,6 +290,7 @@ object Main extends SimpleSwingApplication {
             table.model.asInstanceOf[AbstractTableModel].fireTableDataChanged()
           }
         })
+        toggleableButtons.addOne(btnRemove)
 
         val btnApply = new Button(Action("Apply") {
           if (table.selection.rows.size > 0)
@@ -389,12 +373,8 @@ object Main extends SimpleSwingApplication {
           model = new AbstractTableModel {
             override def getRowCount: Int = drawing.operationSeqManager.count
             override def getColumnCount: Int = 1
-            override def getValueAt(rowIndex: Int, columnIndex: Int): Any = columnIndex match {
-              case _ => drawing.operationSeqManager(rowIndex).name
-            }
-
+            override def getValueAt(rowIndex: Int, columnIndex: Int): Any = drawing.operationSeqManager(rowIndex).name
             override def isCellEditable(rowIndex: Int, columnIndex: Int): Boolean = true
-
             override def setValueAt(aValue: Any, rowIndex: Int, columnIndex: Int): Unit = columnIndex match {
               case 0 =>
                 drawing.operationSeqManager(rowIndex).name = aValue.asInstanceOf[String]
@@ -410,27 +390,12 @@ object Main extends SimpleSwingApplication {
               btnRemove.enabled = selection.rows.size > 0
               btnApply.enabled = selection.rows.size > 0
             }
-            case e: MouseClicked => if (e.source == this && e.modifiers == Key.Modifier.Control && selection.rows.size > 0) {
-              val viewOperationSeqTableModel = new AbstractTableModel {
-                override def getRowCount: Int = drawing.operationSeqManager(peer.getSelectedRow).operations.size
-
-                override def getColumnCount: Int = 1
-
-                override def getValueAt(rowIndex: Int, columnIndex: Int): Any = columnIndex match {
-                  case _ => drawing.operationSeqManager(peer.getSelectedRow).operations(rowIndex).name
-                }
-
-                override def isCellEditable(rowIndex: Int, columnIndex: Int): Boolean = false
-
-                override def setValueAt(aValue: Any, rowIndex: Int, columnIndex: Int): Unit = {}
-              }
-              val viewOperationSeqDialog = new SequenceDialog(
+            case e: MouseClicked => if (e.source == this && e.modifiers == Key.Modifier.Control && selection.rows.size > 0)
+              new SequenceDialog(
                 top,
                 DialogType.Operation,
-                drawing.operationSeqManager(peer.getSelectedRow).name,
-                viewOperationSeqTableModel)
-              viewOperationSeqDialog.visible = true
-            }
+                drawing.operationSeqManager(peer.getSelectedRow).asInstanceOf[Sequence[Any]]
+              ).visible = true
           }
         }
 
@@ -442,39 +407,24 @@ object Main extends SimpleSwingApplication {
         contents += createTableScrollPane(table)
 
         val btnAdd = new Button(Action("Add") {
-          drawing.operationSeqManager.addNewOperationSeq()
+          drawing.operationSeqManager.addOperationSeq()
           table.model.asInstanceOf[AbstractTableModel].fireTableRowsInserted(
             drawing.operationSeqManager.count - 1,
             drawing.operationSeqManager.count - 1
           )
           table.peer.setRowSelectionInterval(drawing.operationSeqManager.count - 1, drawing.operationSeqManager.count - 1)
           table.peer.setColumnSelectionInterval(0, 0)
-          val newOperationSeqTableModel = new AbstractTableModel {
-            override def getRowCount: Int = drawing.operationSeqManager.last.operations.size
-            override def getColumnCount: Int = 1
-            override def getValueAt(rowIndex: Int, columnIndex: Int): Any = columnIndex match {
-              case _ => drawing.operationSeqManager.last.operations(rowIndex).name
-            }
-
-            override def isCellEditable(rowIndex: Int, columnIndex: Int): Boolean = false
-
-            override def setValueAt(aValue: Any, rowIndex: Int, columnIndex: Int): Unit = {}
-          }
+          toggleButtons()
           editingMode = DialogType.Operation
           editingDialog = Some(new SequenceDialog(
             top,
             DialogType.Operation,
-            drawing.operationSeqManager.last.name,
-            newOperationSeqTableModel,
+            drawing.operationSeqManager.last.asInstanceOf[Sequence[Any]],
             true,
-            newName => {
-              drawing.operationSeqManager.last.name = newName
-              table.model.asInstanceOf[AbstractTableModel].fireTableDataChanged()
-            },
-            selectionContains => drawing.operationSeqManager.last.removeOperations(selectionContains),
-            _ => editingDialog = None))
+            _ => stopEditing(table)))
           editingDialog.get.visible = true
         })
+        toggleableButtons.addOne(btnAdd)
 
         val btnRemove = new Button(Action("Remove") {
           if (table.selection.rows.size > 0) {
@@ -482,6 +432,7 @@ object Main extends SimpleSwingApplication {
             table.model.asInstanceOf[AbstractTableModel].fireTableDataChanged()
           }
         })
+        toggleableButtons.addOne(btnRemove)
 
         val btnApply = new Button(Action("Apply") {
           if (table.selection.rows.size > 0)
@@ -531,27 +482,12 @@ object Main extends SimpleSwingApplication {
                 drawing.selectionManager.activeSelection =
                   if (selection.rows.size == 1) drawing.selectionManager(peer.getSelectedRow) else Selection.Everything
             }
-            case e: MouseClicked => if (e.source == this && e.modifiers == Key.Modifier.Control && selection.rows.size > 0) {
-              val viewSelectionTableModel = new AbstractTableModel {
-                override def getRowCount: Int = drawing.selectionManager(peer.getSelectedRow).rects.size
-
-                override def getColumnCount: Int = 1
-
-                override def getValueAt(rowIndex: Int, columnIndex: Int): Any = columnIndex match {
-                  case _ => drawing.selectionManager(peer.getSelectedRow).rects(rowIndex).toString
-                }
-
-                override def isCellEditable(rowIndex: Int, columnIndex: Int): Boolean = false
-
-                override def setValueAt(aValue: Any, rowIndex: Int, columnIndex: Int): Unit = {}
-              }
-              val viewSelectionDialog = new SequenceDialog(
+            case e: MouseClicked => if (e.source == this && e.modifiers == Key.Modifier.Control && selection.rows.size > 0)
+              new SequenceDialog(
                 top,
                 DialogType.Selection,
-                drawing.selectionManager(peer.getSelectedRow).name,
-                viewSelectionTableModel)
-              viewSelectionDialog.visible = true
-            }
+                drawing.selectionManager(peer.getSelectedRow).asInstanceOf[Sequence[Any]]
+              ).visible = true
           }
         }
 
@@ -563,39 +499,24 @@ object Main extends SimpleSwingApplication {
         contents += createTableScrollPane(table)
 
         val btnAdd = new Button(Action("Add") {
-          drawing.selectionManager.addNewSelection()
+          drawing.selectionManager.addSelection()
           table.model.asInstanceOf[AbstractTableModel].fireTableRowsInserted(
             drawing.selectionManager.count - 1,
             drawing.selectionManager.count - 1
           )
           table.peer.setRowSelectionInterval(drawing.selectionManager.count - 1, drawing.selectionManager.count - 1)
           table.peer.setColumnSelectionInterval(0, 0)
-          val newSelectionTableModel = new AbstractTableModel {
-            override def getRowCount: Int = drawing.selectionManager.last.rects.size
-            override def getColumnCount: Int = 1
-            override def getValueAt(rowIndex: Int, columnIndex: Int): Any = columnIndex match {
-              case _ => drawing.selectionManager.last.rects(rowIndex).toString
-            }
-
-            override def isCellEditable(rowIndex: Int, columnIndex: Int): Boolean = false
-
-            override def setValueAt(aValue: Any, rowIndex: Int, columnIndex: Int): Unit = {}
-          }
+          toggleButtons()
           editingMode = DialogType.Selection
           editingDialog = Some(new SequenceDialog(
             top,
             DialogType.Selection,
-            drawing.selectionManager.last.name,
-            newSelectionTableModel,
+            drawing.selectionManager.last.asInstanceOf[Sequence[Any]],
             true,
-            newName => {
-              drawing.selectionManager.last.name = newName
-              table.model.asInstanceOf[AbstractTableModel].fireTableDataChanged()
-            },
-            selectionContains => drawing.selectionManager.last.removeRects(selectionContains),
-            _ => editingDialog = None))
+            _ => stopEditing(table)))
           editingDialog.get.visible = true
         })
+        toggleableButtons.addOne(btnAdd)
 
         val btnRemove = new Button(Action("Remove") {
           if (table.selection.rows.size > 0) {
@@ -604,6 +525,7 @@ object Main extends SimpleSwingApplication {
             drawing.render()
           }
         })
+        toggleableButtons.addOne(btnRemove)
 
         contents += createHorizontalBoxPanel(Seq(btnAdd, btnRemove))
       }
@@ -683,9 +605,9 @@ object Main extends SimpleSwingApplication {
 
         val btnAdd = new Button(Action("Add") {
           if (table.selection.rows.size == 1)
-            drawing.layerManager.addNewLayer(table.peer.getSelectedRow)
+            drawing.layerManager.addLayer(table.peer.getSelectedRow)
           else
-            drawing.layerManager.addNewLayer()
+            drawing.layerManager.addLayer()
           table.model.asInstanceOf[AbstractTableModel].fireTableRowsInserted(0, 0)
           if (table.selection.rows.size == 1) {
             table.peer.setRowSelectionInterval(table.peer.getSelectedRow - 1, table.peer.getSelectedRow - 1)
@@ -695,6 +617,7 @@ object Main extends SimpleSwingApplication {
             table.peer.setColumnSelectionInterval(1, 1)
           }
         })
+        toggleableButtons.addOne(btnAdd)
 
         val btnRemove = new Button(Action("Remove") {
           if (table.selection.rows.size > 0) {
@@ -705,6 +628,7 @@ object Main extends SimpleSwingApplication {
             drawing.render()
           }
         })
+        toggleableButtons.addOne(btnRemove)
 
         val btnLoad = new Button(Action("Load") {
           if (table.selection.rows.size == 1) {
@@ -717,6 +641,7 @@ object Main extends SimpleSwingApplication {
             }
           }
         })
+        toggleableButtons.addOne(btnLoad)
 
         contents += createHorizontalBoxPanel(Seq(btnAdd, btnRemove, btnLoad))
       }

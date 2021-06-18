@@ -98,6 +98,6 @@ class LayerManager extends Manager[Layer]("Layer", name => new Layer(name), true
     frameBuffer = loadNextFrame
   }
 
-  def addNewLayer(position: Int = 0): Unit = super.addNewElement(position)
+  def addLayer(position: Int = 0): Unit = super.addElement(position)
   def removeLayers(selectionContains: Int => Boolean): Unit = super.removeElements(selectionContains)
 }

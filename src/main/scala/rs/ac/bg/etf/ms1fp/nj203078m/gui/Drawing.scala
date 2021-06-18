@@ -20,6 +20,7 @@ class Drawing extends Component {
   var clickedLayer: Option[Layer] = None
   var clickPoint: Point = new Point
   var moveRect: Rectangle = new Rectangle
+  var dragRect: Rectangle = new Rectangle
 
   def render(): Unit = {
     layerManager.render()

@@ -1,27 +1,21 @@
 package rs.ac.bg.etf.ms1fp.nj203078m.model.operation
 
 import rs.ac.bg.etf.ms1fp.nj203078m.model.Pixel
-import rs.ac.bg.etf.ms1fp.nj203078m.model.manager.ElementBase
+import rs.ac.bg.etf.ms1fp.nj203078m.model.traits.Sequence
 
-import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.ArrayBuffer
 
-case class Function (initialName: String) extends PixelOperation (initialName) with ElementBase {
+case class Function (initialName: String) extends PixelOperation (initialName) with Sequence[PixelOperation] {
   override val value: Float = 0.0f
   override var id: Int = Function.getNextId
 
-  var operations: ListBuffer[PixelOperation] = new ListBuffer[PixelOperation]
-
-  def removeOperations(selectionContains: Int => Boolean): Unit = {
-    val tmp = operations
-    operations = new ListBuffer[PixelOperation]
-    for (i <- tmp.indices)
-      if (!selectionContains(i))
-        operations += tmp(i)
-  }
+  def operations: ArrayBuffer[PixelOperation] = components
+  def addPixelOperation(pixelOp: PixelOperation, position: Int = count): Unit = addComponent(pixelOp, position)
+  def removePixelOperations(selectionContains: Int => Boolean): Unit = removeComponents(selectionContains)
 
   override def apply(pixel: Pixel): Pixel = {
     var tmp = pixel
-    for (op <- operations)
+    for (op <- components)
       tmp = op(tmp)
     tmp
   }
@@ -36,16 +30,16 @@ object Function {
   }
 
   val Inverse: Function = new Function("Inverse") {
-    operations += SubtractFrom(1.0f)
+    addComponent(SubtractFrom(1.0f))
   }
 
   val Desaturate: Function = new Function("Desaturate") {
-    operations += new PixelOperation("Average") {
+    addComponent(new PixelOperation("Average") {
       override val value: Float = 0.0f
       override def apply(pixel: Pixel): Pixel = {
         val avg: Float = (pixel.red + pixel.green + pixel.blue) / 3.0f
         new Pixel(pixel.alpha, avg, avg, avg)
       }
-    }
+    })
   }
 }

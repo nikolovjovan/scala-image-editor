@@ -1,7 +1,7 @@
 package rs.ac.bg.etf.ms1fp.nj203078m.model
 
-import rs.ac.bg.etf.ms1fp.nj203078m.model.manager.ElementBase
 import rs.ac.bg.etf.ms1fp.nj203078m.model.operation.{Operation, OperationSeq}
+import rs.ac.bg.etf.ms1fp.nj203078m.model.traits.ElementBase
 
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
@@ -106,12 +106,26 @@ class Layer (var name: String, var alpha: Float = 1.0f) extends ElementBase {
             case op: Operation => output = executeOp(rects, input, output, op)
           }
           if (i < seq.operations.size - 1) {
-            val tmp = input
-            input = output
-            output = tmp
-            for (x <- 0 until output.width)
-              for (y <- 0 until output.height)
-                output(x)(y) = Pixel.Empty
+            // We can swap input and output images if they are the same size!
+            //
+            if (input.x == output.x &&
+                input.y == output.y &&
+                input.width == output.width &&
+                input.height == output.height) {
+              val tmp = input
+              input = output
+              output = tmp
+              for (x <- 0 until output.width)
+                for (y <- 0 until output.height)
+                  output(x)(y) = Pixel.Empty
+            } else {
+              // Output of current operation becomes input of the following.
+              //
+              input = output
+              // We need to create a new output image with the same size as previous output.
+              //
+              output = new Image(output.width, output.height, output.x, output.y)
+            }
           }
         }
         // Set selection id because in and out may have been swapped!

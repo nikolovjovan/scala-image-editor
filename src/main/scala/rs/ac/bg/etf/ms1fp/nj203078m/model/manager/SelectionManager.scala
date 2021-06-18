@@ -8,7 +8,7 @@ import scala.collection.mutable
 class SelectionManager(renderDrawing: () => Unit, layerManager: LayerManager) extends Manager[Selection]("Selection", name => new Selection(name)) {
   var activeSelection: Selection = Selection.Everything
 
-  def addNewSelection(position: Int = count): Unit = super.addNewElement(position)
+  def addSelection(position: Int = count): Unit = super.addElement(position)
   def removeSelections(selectionContains: Int => Boolean): Unit = {
     val selectionIds: mutable.HashSet[Int] = new mutable.HashSet[Int]
     for (i <- elements.indices)
