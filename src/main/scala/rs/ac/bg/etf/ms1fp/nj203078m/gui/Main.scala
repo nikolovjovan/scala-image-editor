@@ -1,7 +1,7 @@
 package rs.ac.bg.etf.ms1fp.nj203078m.gui
 
 import rs.ac.bg.etf.ms1fp.nj203078m.model._
-import rs.ac.bg.etf.ms1fp.nj203078m.model.operation.{Abs, Add, Divide, DivideBy, FillWith, Log, MaxWith, Median, MinWith, MultiplyBy, Operation, PixelOperation, PowerBy, SubtractBy, SubtractFrom, WeightedMean}
+import rs.ac.bg.etf.ms1fp.nj203078m.model.operation.{Abs, Add, Divide, DivideBy, FillWith, Log, MaxWith, Median, MinWith, MultiplyBy, Operation, PixelOperation, PowerBy, SubtractBy, SubtractFrom, WeightedAverage}
 import rs.ac.bg.etf.ms1fp.nj203078m.model.traits.Sequence
 
 import java.awt.Color
@@ -341,7 +341,7 @@ object Main extends SimpleSwingApplication {
         contents += new BoxPanel(Orientation.Horizontal) {
           xLayoutAlignment = java.awt.Component.CENTER_ALIGNMENT
           contents += new Button(Action("Median")(executeOrAddOperation(Median(N))))
-          contents += new Button(Action("Weighted mean") {
+          contents += new Button(Action("Weighted average") {
             if (txtWeightMatrix.text.matches(".*[a-zA-Z]+.*"))
               Dialog.showMessage(this, "Invalid weight matrix!", "Error!", Dialog.Message.Error)
             val weights: Image.PixelMatrix = new Array[Image.PixelVector](D)
@@ -355,7 +355,7 @@ object Main extends SimpleSwingApplication {
                     Dialog.showMessage(this, "Invalid weight matrix!", "Error!", Dialog.Message.Error)
                     throw new Exception
                   } else weights(x)(y) = scanner.nextFloat()
-              drawing.selectionManager.execute(layerSelectionContains, WeightedMean(N, weights))
+              drawing.selectionManager.execute(layerSelectionContains, WeightedAverage(N, weights))
             } catch {
               case _:Exception =>
             }

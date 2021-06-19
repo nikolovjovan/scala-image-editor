@@ -40,20 +40,21 @@ case class Median (N: Int) extends Operation ("Median N = " + N) {
     )
 }
 
-case class WeightedMean (N: Int, weights: Image.PixelMatrix) extends Operation ("Weighted mean N = " + N + " weights: " + weights.mkString("[", ", ", "]")) {
-  require(N > 0, "Weighted mean requires at least a filter of dimension (2 * N + 1) = 3!")
-  require(weights.length == D && weights(0).length == D, "Weighted mean requires a weight matrix with dimension " + D + "x" + D + "!")
+case class WeightedAverage (N: Int, weights: Image.PixelMatrix) extends Operation ("Weighted average N = " + N + " weights: " + weights.mkString("[", ", ", "]")) {
+  require(N > 0, "Weighted average requires at least a filter of dimension (2 * N + 1) = 3!")
+  require(weights.length == D && weights(0).length == D, "Weighted average requires a weight matrix with dimension " + D + "x" + D + "!")
 
   override def execute(image: Image, cx: Int, cy: Int): Pixel = {
-    var red, green, blue: Float = 0.0f
+    var alpha, red, green, blue: Float = 0.0f
     for (x <- 0 until D)
       for (y <- 0 until D) {
         val input: Pixel = getInputPixel(image, x - N + cx, y - N + cy) * weights(x)(y)
+        alpha += input.alpha
         red += input.red
         green += input.green
         blue += input.blue
       }
     val size: Int = D * D
-    new Pixel(image(cx)(cy).alpha, red / size, green / size, blue / size)
+    new Pixel(alpha / size, red / size, green / size, blue / size)
   }
 }
