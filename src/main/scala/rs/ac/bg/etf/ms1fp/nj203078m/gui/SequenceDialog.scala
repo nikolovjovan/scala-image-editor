@@ -92,7 +92,7 @@ class SequenceDialog private (owner: Window) extends Dialog (owner) {
           listenTo(selection)
           reactions += {
             case e: TableRowsSelected => if (e.source == this) {
-              btnRemove.get.enabled = selection.rows.size > 0 && peer.getSelectedRow != 0 && peer.getSelectedRow != 1
+              btnRemove.get.enabled = selection.rows.size > 0
             }
           }
         }
@@ -111,7 +111,9 @@ class SequenceDialog private (owner: Window) extends Dialog (owner) {
             sequence.removeComponents(table.get.selection.rows.contains)
             table.get.model.asInstanceOf[AbstractTableModel].fireTableDataChanged()
           }
-        }))
+        }) {
+          enabled = false
+        })
 
         val btnSave = new Button(Action("Save") {
           sequence.name = txtName.get.text

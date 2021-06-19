@@ -1,14 +1,15 @@
 package rs.ac.bg.etf.ms1fp.nj203078m.gui
 
 import rs.ac.bg.etf.ms1fp.nj203078m.model._
+import rs.ac.bg.etf.ms1fp.nj203078m.model.manager.{FunctionManager, LayerManager, OperationSeqManager, SelectionManager}
 import rs.ac.bg.etf.ms1fp.nj203078m.model.operation.{Abs, Add, Divide, DivideBy, FillWith, Log, MaxWith, Median, MinWith, MultiplyBy, Operation, PixelOperation, PowerBy, SubtractBy, SubtractFrom, WeightedAverage}
 import rs.ac.bg.etf.ms1fp.nj203078m.model.traits.Sequence
 
 import java.awt.Color
-import java.io.File
+import java.io.{File, FileInputStream, FileOutputStream, ObjectInputStream, ObjectOutputStream}
 import java.util.Scanner
 import javax.swing.event.ChangeEvent
-import javax.swing.{JSpinner, ListSelectionModel, SpinnerNumberModel}
+import javax.swing.{JDialog, JLabel, JOptionPane, JSpinner, ListSelectionModel, SpinnerNumberModel}
 import javax.swing.filechooser.FileNameExtensionFilter
 import javax.swing.table.AbstractTableModel
 import scala.collection.mutable.ArrayBuffer
@@ -86,6 +87,106 @@ object Main extends SimpleSwingApplication {
     updateTable.model.asInstanceOf[AbstractTableModel].fireTableDataChanged()
   }
 
+  val tablesToUpdate: ArrayBuffer[Table] = new ArrayBuffer[Table]()
+
+  def updateUI(): Unit = {
+    // Redraw drawing
+    //
+    drawing.render()
+
+    // Update tables
+    //
+    for (table <- tablesToUpdate)
+      table.model.asInstanceOf[AbstractTableModel].fireTableDataChanged()
+
+    // Enable all buttons
+    //
+    for (btn <- toggleableButtons)
+      btn.enabled = true
+  }
+
+  var projectFileName: String = ""
+
+  def newProject(): Unit = {
+    projectFileName = ""
+    drawing.layerManager = new LayerManager
+    drawing.selectionManager = new SelectionManager(drawing.render, drawing.layerManager)
+    drawing.functionManager = new FunctionManager
+    drawing.operationSeqManager = new OperationSeqManager
+    updateUI()
+  }
+
+  def createFileChooser(): FileChooser = {
+    val chooser = new FileChooser(new File(System.getProperty("user.dir")))
+    chooser.peer.removeChoosableFileFilter(chooser.peer.getAcceptAllFileFilter)
+    chooser
+  }
+
+  def createProjectFileChooser(): FileChooser = {
+    val chooser = createFileChooser()
+    chooser.fileFilter = new FileNameExtensionFilter("Scala Image Editor Project Files (*.siep)", "siep")
+    chooser
+  }
+
+  def saveProject(forceDialog: Boolean = false): Unit = {
+    var fileName: String = projectFileName
+    if (fileName.isEmpty || forceDialog) {
+      val chooser = createProjectFileChooser()
+      if (chooser.showSaveDialog(top) == FileChooser.Result.Approve)
+        fileName = chooser.selectedFile.getAbsolutePath
+      else
+        return
+    }
+    if (fileName.isEmpty)
+      return
+    if (!fileName.endsWith(".siep"))
+      fileName += ".siep"
+    val oos: ObjectOutputStream = new ObjectOutputStream(new FileOutputStream(fileName))
+    oos.writeObject(drawing.layerManager)
+    // Writing SelectionManager fails because Drawing.render function is referenced so Drawing needs serialization
+    // which is not necessary for saving project state.
+    // In order to bypass this problem, before writing object remove references to Drawing.render and LayerManager
+    // and after writing restore them. (This means that on project load they need to be restored too!)
+    //
+    drawing.selectionManager.renderDrawing = null
+    drawing.selectionManager.layerManager = null
+    oos.writeObject(drawing.selectionManager)
+    drawing.selectionManager.renderDrawing = drawing.render
+    drawing.selectionManager.layerManager = drawing.layerManager
+    oos.writeObject(drawing.functionManager)
+    oos.writeObject(drawing.operationSeqManager)
+    oos.close()
+  }
+
+  def loadProject(): Unit = {
+    val chooser = createProjectFileChooser()
+    if (chooser.showOpenDialog(top) == FileChooser.Result.Approve) {
+      val ois: ObjectInputStream = new ObjectInputStream(new FileInputStream(chooser.selectedFile.getAbsolutePath)){
+        // ref: https://stackoverflow.com/questions/16386252/scala-deserialization-class-not-found
+        //
+        override def resolveClass(desc: java.io.ObjectStreamClass): Class[_] = {
+          try { Class.forName(desc.getName, false, getClass.getClassLoader) }
+          catch { case _: ClassNotFoundException => super.resolveClass(desc) }
+        }
+      }
+      drawing.layerManager = ois.readObject().asInstanceOf[LayerManager]
+      drawing.selectionManager = ois.readObject().asInstanceOf[SelectionManager]
+      // Restore broken references. See comment above in saveProject function.
+      //
+      drawing.selectionManager.renderDrawing = drawing.render
+      drawing.selectionManager.layerManager = drawing.layerManager
+      drawing.functionManager = ois.readObject().asInstanceOf[FunctionManager]
+      drawing.operationSeqManager = ois.readObject().asInstanceOf[OperationSeqManager]
+      ois.close()
+      updateUI()
+    }
+  }
+
+  def exportProject(): Unit = {
+    // TODO: Show export dialog (create a custom class with preview)
+    // Find a good way to separate layer visibility and alpha in order to prevent changing actual values
+  }
+
   override def top: Frame = frame
 
   val frame: Frame = new MainFrame {
@@ -93,35 +194,25 @@ object Main extends SimpleSwingApplication {
 
     menuBar = new MenuBar {
       contents += new Menu("File") {
-        contents += new MenuItem(Action("New Project") {
-          // TODO: Call new project!
-          println("New project!")
-        })
-        contents += new MenuItem(Action("Load Project") {
-          // TODO: Call load project!
-          println("Load project!")
-        })
+        contents += new MenuItem(Action("New Project") { newProject() })
+        contents += new MenuItem(Action("Load Project") { loadProject() })
         contents += new Separator
-        contents += new MenuItem(Action("Save Project") {
-          // TODO: Call save project!
-          println("Save project!")
-        })
-        contents += new MenuItem(Action("Save Project As") {
-          // TODO: Call save project as!
-          println("Save project as!")
-        })
+        contents += new MenuItem(Action("Save Project") { saveProject() })
+        contents += new MenuItem(Action("Save Project As") { saveProject(true) })
         contents += new Separator
-        contents += new MenuItem(Action("Export") {
-          // TODO: Call export project!
-          println("Export project!")
-        })
+        contents += new MenuItem(Action("Export") { exportProject() })
         contents += new Separator
         contents += new MenuItem(Action("Exit") {
           quit()
         })
       }
-      contents += new Menu("About") {
-        action = Action("About") { println("About project!") }
+      contents += new Menu("Help") {
+        contents += new MenuItem(Action("About") {
+          val optionPane: JOptionPane = new JOptionPane(new JLabel("<html><center>Created for a course in functional programming.<br>Copyright © 2021 - Jovan Nikolov 2020/3078</center>"))
+          val aboutDialog: JDialog = optionPane.createDialog("About Scala Image Editor")
+          aboutDialog.setModal(true)
+          aboutDialog.setVisible(true)
+        })
       }
     }
 
@@ -245,7 +336,7 @@ object Main extends SimpleSwingApplication {
           listenTo(selection, mouse.clicks)
           reactions += {
             case e: TableRowsSelected => if (e.source == this) {
-              btnRemove.enabled = selection.rows.size > 0 && peer.getSelectedRow != 0 && peer.getSelectedRow != 1
+              btnRemove.enabled = editingDialog.isEmpty && selection.rows.size > 0 && peer.getSelectedRow != 0 && peer.getSelectedRow != 1
               btnApply.enabled = selection.rows.size > 0
             }
             case e: MouseClicked => if (e.source == this && e.modifiers == Key.Modifier.Control && selection.rows.size > 0)
@@ -256,6 +347,7 @@ object Main extends SimpleSwingApplication {
               ).visible = true
           }
         }
+        tablesToUpdate += table
 
         listenTo(mouse.clicks)
         reactions += {
@@ -284,12 +376,14 @@ object Main extends SimpleSwingApplication {
         })
         toggleableButtons.addOne(btnAdd)
 
-        val btnRemove = new Button(Action("Remove") {
+        val btnRemove: Button = new Button(Action("Remove") {
           if (table.selection.rows.size > 0) {
             drawing.functionManager.removeFunctions(table.selection.rows.contains)
             table.model.asInstanceOf[AbstractTableModel].fireTableDataChanged()
           }
-        })
+        }) {
+          enabled = false
+        }
         toggleableButtons.addOne(btnRemove)
 
         val btnApply = new Button(Action("Apply") {
@@ -342,22 +436,30 @@ object Main extends SimpleSwingApplication {
           xLayoutAlignment = java.awt.Component.CENTER_ALIGNMENT
           contents += new Button(Action("Median")(executeOrAddOperation(Median(N))))
           contents += new Button(Action("Weighted average") {
-            if (txtWeightMatrix.text.matches(".*[a-zA-Z]+.*"))
-              Dialog.showMessage(this, "Invalid weight matrix!", "Error!", Dialog.Message.Error)
-            val weights: Image.PixelMatrix = new Array[Image.PixelVector](D)
-            for (x <- 0 until D)
-              weights(x) = new Image.PixelVector(D)
-            val scanner: Scanner = new Scanner(txtWeightMatrix.text)
-            try {
-              for (y <- 0 until D)
+            if (editingDialog.isDefined && editingMode == DialogType.Function)
+              Dialog.showMessage(top, "Functions can be consisted of pixel operations only!", "Warning!", Dialog.Message.Warning)
+            else {
+              if (txtWeightMatrix.text.matches(".*[a-zA-Z]+.*"))
+                Dialog.showMessage(this, "Invalid weight matrix!", "Error!", Dialog.Message.Error)
+              if (txtWeightMatrix.text.isEmpty)
+                executeOrAddOperation(WeightedAverage(N, Array.tabulate(D, D)((_, _) => 1.0f)))
+              else {
+                val weights: Image.PixelMatrix = new Array[Image.PixelVector](D)
                 for (x <- 0 until D)
-                  if (!scanner.hasNextFloat) {
-                    Dialog.showMessage(this, "Invalid weight matrix!", "Error!", Dialog.Message.Error)
-                    throw new Exception
-                  } else weights(x)(y) = scanner.nextFloat()
-              drawing.selectionManager.execute(layerSelectionContains, WeightedAverage(N, weights))
-            } catch {
-              case _:Exception =>
+                  weights(x) = new Image.PixelVector(D)
+                val scanner: Scanner = new Scanner(txtWeightMatrix.text)
+                try {
+                  for (y <- 0 until D)
+                    for (x <- 0 until D)
+                      if (!scanner.hasNextFloat) {
+                        Dialog.showMessage(this, "Invalid weight matrix!", "Error!", Dialog.Message.Error)
+                        throw new Exception
+                      } else weights(x)(y) = scanner.nextFloat()
+                  drawing.selectionManager.execute(layerSelectionContains, WeightedAverage(N, weights))
+                } catch {
+                  case _: Exception =>
+                }
+              }
             }
           })
         }
@@ -387,7 +489,7 @@ object Main extends SimpleSwingApplication {
           listenTo(selection, mouse.clicks)
           reactions += {
             case e: TableRowsSelected => if (e.source == this) {
-              btnRemove.enabled = selection.rows.size > 0
+              btnRemove.enabled = editingDialog.isEmpty && selection.rows.size > 0
               btnApply.enabled = selection.rows.size > 0
             }
             case e: MouseClicked => if (e.source == this && e.modifiers == Key.Modifier.Control && selection.rows.size > 0)
@@ -398,6 +500,7 @@ object Main extends SimpleSwingApplication {
               ).visible = true
           }
         }
+        tablesToUpdate += table
 
         listenTo(mouse.clicks)
         reactions += {
@@ -426,12 +529,14 @@ object Main extends SimpleSwingApplication {
         })
         toggleableButtons.addOne(btnAdd)
 
-        val btnRemove = new Button(Action("Remove") {
+        val btnRemove: Button = new Button(Action("Remove") {
           if (table.selection.rows.size > 0) {
             drawing.operationSeqManager.removeOperationSeqs(table.selection.rows.contains)
             table.model.asInstanceOf[AbstractTableModel].fireTableDataChanged()
           }
-        })
+        }) {
+          enabled = false
+        }
         toggleableButtons.addOne(btnRemove)
 
         val btnApply = new Button(Action("Apply") {
@@ -477,7 +582,7 @@ object Main extends SimpleSwingApplication {
           listenTo(selection, mouse.clicks)
           reactions += {
             case e: TableRowsSelected => if (e.source == this) {
-              btnRemove.enabled = selection.rows.size > 0
+              btnRemove.enabled = editingDialog.isEmpty && selection.rows.size > 0
               if (selection.rows.size > 0)
                 drawing.selectionManager.activeSelection =
                   if (selection.rows.size == 1) drawing.selectionManager(peer.getSelectedRow) else Selection.Everything
@@ -490,6 +595,7 @@ object Main extends SimpleSwingApplication {
               ).visible = true
           }
         }
+        tablesToUpdate += table
 
         listenTo(mouse.clicks)
         reactions += {
@@ -518,13 +624,15 @@ object Main extends SimpleSwingApplication {
         })
         toggleableButtons.addOne(btnAdd)
 
-        val btnRemove = new Button(Action("Remove") {
+        val btnRemove: Button = new Button(Action("Remove") {
           if (table.selection.rows.size > 0) {
             drawing.selectionManager.removeSelections(table.selection.rows.contains)
             table.model.asInstanceOf[AbstractTableModel].fireTableDataChanged()
             drawing.render()
           }
-        })
+        }) {
+          enabled = false
+        }
         toggleableButtons.addOne(btnRemove)
 
         contents += createHorizontalBoxPanel(Seq(btnAdd, btnRemove))
@@ -588,13 +696,15 @@ object Main extends SimpleSwingApplication {
             case e: TableRowsSelected => if (e.source == this) {
               sldOpacity.enabled = selection.rows.size > 0
               lblOpacity.enabled = selection.rows.size > 0
-              btnRemove.enabled = selection.rows.size > 0
-              btnLoad.enabled = selection.rows.size == 1
+              btnDuplicate.enabled = editingDialog.isEmpty && selection.rows.size == 1
+              btnRemove.enabled = editingDialog.isEmpty && selection.rows.size > 0
+              btnLoad.enabled = editingDialog.isEmpty && selection.rows.size == 1
               sldOpacity.value = if (selection.rows.size == 1) (drawing.layerManager(peer.getSelectedRow).alpha * 100.0f).toInt else 100
             }
           }
           layerSelectionContains = selection.rows.contains
         }
+        tablesToUpdate += table
 
         listenTo(mouse.clicks)
         reactions += {
@@ -603,23 +713,36 @@ object Main extends SimpleSwingApplication {
 
         contents += createTableScrollPane(table)
 
-        val btnAdd = new Button(Action("Add") {
-          if (table.selection.rows.size == 1)
-            drawing.layerManager.addLayer(table.peer.getSelectedRow)
-          else
-            drawing.layerManager.addLayer()
-          table.model.asInstanceOf[AbstractTableModel].fireTableRowsInserted(0, 0)
+        val btnDuplicate: Button = new Button(Action("Duplicate") {
           if (table.selection.rows.size == 1) {
-            table.peer.setRowSelectionInterval(table.peer.getSelectedRow - 1, table.peer.getSelectedRow - 1)
+            val selectedRow = table.peer.getSelectedRow
+            drawing.layerManager.duplicateLayer(selectedRow)
+            table.model.asInstanceOf[AbstractTableModel].fireTableRowsInserted(selectedRow, selectedRow)
+            table.peer.setRowSelectionInterval(selectedRow, selectedRow)
+            table.peer.setColumnSelectionInterval(1, 1)
+          }
+        }) {
+          enabled = false
+        }
+        toggleableButtons.addOne(btnDuplicate)
+
+        val btnAdd = new Button(Action("Add") {
+          if (table.selection.rows.size == 1) {
+            val selectedRow = table.peer.getSelectedRow
+            drawing.layerManager.addLayer(selectedRow)
+            table.model.asInstanceOf[AbstractTableModel].fireTableRowsInserted(selectedRow, selectedRow)
+            table.peer.setRowSelectionInterval(selectedRow, selectedRow)
             table.peer.setColumnSelectionInterval(1, 1)
           } else {
+            drawing.layerManager.addLayer()
+            table.model.asInstanceOf[AbstractTableModel].fireTableRowsInserted(0, 0)
             table.peer.setRowSelectionInterval(0, 0)
             table.peer.setColumnSelectionInterval(1, 1)
           }
         })
         toggleableButtons.addOne(btnAdd)
 
-        val btnRemove = new Button(Action("Remove") {
+        val btnRemove: Button = new Button(Action("Remove") {
           if (table.selection.rows.size > 0) {
             drawing.layerManager.removeLayers(table.selection.rows.contains)
             table.model.asInstanceOf[AbstractTableModel].fireTableDataChanged()
@@ -627,23 +750,26 @@ object Main extends SimpleSwingApplication {
             table.peer.setColumnSelectionInterval(1, 1)
             drawing.render()
           }
-        })
+        }) {
+          enabled = false
+        }
         toggleableButtons.addOne(btnRemove)
 
-        val btnLoad = new Button(Action("Load") {
+        val btnLoad: Button = new Button(Action("Load") {
           if (table.selection.rows.size == 1) {
-            val chooser = new FileChooser(new File(System.getProperty("user.dir")))
-            chooser.peer.removeChoosableFileFilter(chooser.peer.getAcceptAllFileFilter)
+            val chooser = createFileChooser()
             chooser.fileFilter = new FileNameExtensionFilter("Image files (*.png, *.jpg, *.jpeg)", "png", "jpg", "jpeg")
             if (chooser.showOpenDialog(this) == FileChooser.Result.Approve) {
               drawing.layerManager(table.selection.rows.leadIndex).loadImage(chooser.selectedFile.getAbsolutePath)
               drawing.render()
             }
           }
-        })
+        }) {
+          enabled = false
+        }
         toggleableButtons.addOne(btnLoad)
 
-        contents += createHorizontalBoxPanel(Seq(btnAdd, btnRemove, btnLoad))
+        contents += createHorizontalBoxPanel(Seq(btnDuplicate, btnAdd, btnRemove, btnLoad))
       }
 
       val sideView: SplitPane = createHorizontalSplitPane(tpFFO, createHorizontalSplitPane(selections, layers))

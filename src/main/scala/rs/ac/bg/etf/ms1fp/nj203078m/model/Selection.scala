@@ -7,6 +7,16 @@ import scala.collection.mutable.ArrayBuffer
 class Selection(var name: String) extends Sequence[Rect] {
   override var id: Int = Selection.getNextId
 
+  override def equals(obj: Any): Boolean = obj match {
+    case that: Selection =>
+      // Loading a project would have a different instance of Selection.Everything!
+      // Therefore only compare selection id in this specific case!
+      //
+      if (this.id == 0 && that.id == 0) true
+      else super.equals(obj)
+    case _ => super.equals(obj)
+  }
+
   def rects: ArrayBuffer[Rect] = components
   def addRect(rect: Rect, position: Int = count): Unit = addComponent(rect, position)
   def removeRects(selectionContains: Int => Boolean): Unit = removeComponents(selectionContains)

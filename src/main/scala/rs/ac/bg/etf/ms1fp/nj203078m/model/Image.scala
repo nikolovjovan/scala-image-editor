@@ -6,7 +6,7 @@ import java.io.File
 import javax.imageio.ImageIO
 import scala.util.{Failure, Success, Try}
 
-class Image (var fileName: String) {
+class Image (var fileName: String) extends Serializable {
   var selectionId: Int = -1
 
   var pixels: Image.PixelMatrix = Array.empty
@@ -26,6 +26,15 @@ class Image (var fileName: String) {
     this.x = x
     this.y = y
     this.selectionId = selectionId
+  }
+
+  def this(that: Image) {
+    this()
+    selectionId = that.selectionId
+    pixels = Array.tabulate(that.width, that.height)((x, y) => new Pixel(that.pixels(x)(y)))
+    x = that.x
+    y = that.y
+    fileName = that.fileName
   }
 
   def width: Int = pixels.length

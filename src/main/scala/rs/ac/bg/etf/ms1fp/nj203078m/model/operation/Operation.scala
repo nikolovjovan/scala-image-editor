@@ -4,7 +4,7 @@ import rs.ac.bg.etf.ms1fp.nj203078m.model.{Image, Pixel}
 
 import scala.collection.immutable.ArraySeq
 
-abstract class Operation (var name: String) {
+abstract class Operation (var name: String) extends Serializable {
   val N: Int
   def D: Int = 2 * N + 1
 
@@ -40,7 +40,7 @@ case class Median (N: Int) extends Operation ("Median N = " + N) {
     )
 }
 
-case class WeightedAverage (N: Int, weights: Image.PixelMatrix) extends Operation ("Weighted average N = " + N + " weights: " + weights.mkString("[", ", ", "]")) {
+case class WeightedAverage (N: Int, weights: Image.PixelMatrix) extends Operation ("Weighted average N = " + N) {
   require(N > 0, "Weighted average requires at least a filter of dimension (2 * N + 1) = 3!")
   require(weights.length == D && weights(0).length == D, "Weighted average requires a weight matrix with dimension " + D + "x" + D + "!")
 

@@ -1,9 +1,11 @@
 package rs.ac.bg.etf.ms1fp.nj203078m.gui
 
+import rs.ac.bg.etf.ms1fp.nj203078m.interop.ImageConverter
 import rs.ac.bg.etf.ms1fp.nj203078m.model.Layer
 import rs.ac.bg.etf.ms1fp.nj203078m.model.manager.{FunctionManager, LayerManager, OperationSeqManager, SelectionManager}
 
 import java.awt.Color
+import java.awt.image.BufferedImage
 import javax.swing.JViewport
 import scala.swing.event.{MouseDragged, MousePressed, MouseReleased}
 import scala.swing.{Component, Dimension, Graphics2D, Point, Rectangle}
@@ -22,8 +24,10 @@ class Drawing extends Component {
   var moveRect: Rectangle = new Rectangle
   var dragRect: Rectangle = new Rectangle
 
+  var frameBuffer: BufferedImage = ImageConverter.imgToBufImg(layerManager.output)
+
   def render(): Unit = {
-    layerManager.render()
+    frameBuffer = ImageConverter.imgToBufImg(layerManager.render())
     repaint()
   }
 
@@ -78,7 +82,7 @@ class Drawing extends Component {
       g.setColor(foreground)
       g.fillRect(1, 1, layerManager.outputSize.width, layerManager.outputSize.height)
       if (!layerManager.output.isEmpty)
-        g.drawImage(layerManager.frameBuffer, null, layerManager.output.x + 1, layerManager.output.y + 1)
+        g.drawImage(frameBuffer, null, layerManager.output.x + 1, layerManager.output.y + 1)
       g.setColor(Color.BLACK)
       g.drawRect(0, 0, layerManager.outputSize.width + 1, layerManager.outputSize.height + 1)
     }

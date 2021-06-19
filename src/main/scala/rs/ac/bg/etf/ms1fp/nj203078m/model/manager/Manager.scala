@@ -7,7 +7,7 @@ import scala.collection.mutable.ArrayBuffer
 
 // TODO: Look into TypeTag...
 //
-abstract class Manager[T <: ElementBase](nameTemplate: String, new_T: String => T, neverEmpty: Boolean = false) {
+abstract class Manager[T <: ElementBase](nameTemplate: String, new_T: String => T, neverEmpty: Boolean = false) extends Serializable {
   protected var elements: ArrayBuffer[T] =
     if (neverEmpty) ArrayBuffer[T](new_T(nameTemplate + " 1")) else new ArrayBuffer[T]
 

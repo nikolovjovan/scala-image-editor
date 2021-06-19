@@ -5,7 +5,7 @@ import rs.ac.bg.etf.ms1fp.nj203078m.model.operation.Operation
 
 import scala.collection.mutable
 
-class SelectionManager(renderDrawing: () => Unit, layerManager: LayerManager) extends Manager[Selection]("Selection", name => new Selection(name)) {
+class SelectionManager(var renderDrawing: () => Unit, var layerManager: LayerManager) extends Manager[Selection]("Selection", name => new Selection(name)) {
   var activeSelection: Selection = Selection.Everything
 
   def addSelection(position: Int = count): Unit = super.addElement(position)

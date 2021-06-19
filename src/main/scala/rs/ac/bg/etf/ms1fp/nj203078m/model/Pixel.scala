@@ -3,7 +3,7 @@ package rs.ac.bg.etf.ms1fp.nj203078m.model
 import java.awt.Color
 import scala.language.implicitConversions
 
-class Pixel(val alpha: Float, val red: Float, val green: Float, val blue: Float) {
+class Pixel(val alpha: Float, val red: Float, val green: Float, val blue: Float) extends Serializable {
   def this() = this(0.0f, 0.0f, 0.0f, 0.0f)
 
   def this(pixel: Pixel) = this(pixel.alpha, pixel.red, pixel.green, pixel.blue)

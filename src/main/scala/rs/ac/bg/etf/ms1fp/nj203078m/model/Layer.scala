@@ -10,6 +10,13 @@ import scala.swing.Dimension
 class Layer (var name: String, var alpha: Float = 1.0f) extends ElementBase {
   def this() = this("")
 
+  def this(that: Layer) {
+    this(that.name, that.alpha)
+    visible = that.visible
+    images = ArrayBuffer.tabulate(that.images.size)(i => new Image(that.images(i)))
+    output = that.output
+  }
+
   override var id: Int = Layer.getNextId
 
   var visible: Boolean = true

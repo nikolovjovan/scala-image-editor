@@ -13,7 +13,7 @@ abstract class PixelOperation (opName: String) extends Operation (opName) {
 
 case class FillWith (color: Color) extends PixelOperation ("Fill with " + Pixel.colorToPixel(color)) {
   override val value: Float = 0.0f
-  override def apply(pixel: Pixel): Pixel = color
+  override def apply(pixel: Pixel): Pixel = Pixel.colorToPixel(color) over pixel
 }
 
 case class Log () extends PixelOperation ("Log") {

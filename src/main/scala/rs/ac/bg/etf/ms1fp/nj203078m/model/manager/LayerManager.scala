@@ -1,19 +1,13 @@
 package rs.ac.bg.etf.ms1fp.nj203078m.model.manager
 
-import rs.ac.bg.etf.ms1fp.nj203078m.interop.ImageConverter
 import rs.ac.bg.etf.ms1fp.nj203078m.model.{Image, Layer, Rect}
 
-import java.awt.image.BufferedImage
 import scala.annotation.tailrec
 import scala.swing.{Dimension, Point}
 
 class LayerManager extends Manager[Layer]("Layer", name => new Layer(name), true) {
   var output: Image = Image.Empty
   var outputSize: Dimension = new Dimension
-
-  var frameBuffer: BufferedImage = loadNextFrame
-
-  def loadNextFrame: BufferedImage = ImageConverter.imgToBufImg(output)
 
   def getLayerAt(point: Point): Option[Layer] = {
     class BreakLoop extends Exception
@@ -42,7 +36,7 @@ class LayerManager extends Manager[Layer]("Layer", name => new Layer(name), true
     }
   }
 
-  def render(): Unit = {
+  def render(): Image = {
 
     @tailrec
     def doRender(x: Int, y: Int, z: Int = 0): Unit = {
@@ -93,11 +87,10 @@ class LayerManager extends Manager[Layer]("Layer", name => new Layer(name), true
       outputSize.height = if (sizeRect.bottom > 0) sizeRect.bottom else 0
     }
 
-    // Convert output image to BufferedImage for painting.
-    //
-    frameBuffer = loadNextFrame
+    output
   }
 
+  def duplicateLayer(position: Int): Unit = elements.insert(position, new Layer(elements(position)))
   def addLayer(position: Int = 0): Unit = super.addElement(position)
   def removeLayers(selectionContains: Int => Boolean): Unit = super.removeElements(selectionContains)
 }

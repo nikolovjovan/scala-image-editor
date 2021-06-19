@@ -3,7 +3,7 @@ package rs.ac.bg.etf.ms1fp.nj203078m.model
 import scala.language.implicitConversions
 import scala.swing.{Dimension, Point, Rectangle}
 
-class Rect {
+class Rect extends Serializable {
   var left: Int = Int.MaxValue
   var top: Int = Int.MaxValue
   var right: Int = Int.MinValue
