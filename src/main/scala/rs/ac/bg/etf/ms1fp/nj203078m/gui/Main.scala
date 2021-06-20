@@ -2,7 +2,7 @@ package rs.ac.bg.etf.ms1fp.nj203078m.gui
 
 import rs.ac.bg.etf.ms1fp.nj203078m.model._
 import rs.ac.bg.etf.ms1fp.nj203078m.model.manager.{FunctionManager, LayerManager, OperationSeqManager, SelectionManager}
-import rs.ac.bg.etf.ms1fp.nj203078m.model.operation.{Abs, Add, Divide, DivideBy, FillWith, Log, MaxWith, Median, MinWith, MultiplyBy, Operation, PixelOperation, PowerBy, SubtractBy, SubtractFrom, WeightedAverage}
+import rs.ac.bg.etf.ms1fp.nj203078m.model.operation.{Abs, Add, Divide, DivideBy, FillWith, Function, Log, MaxWith, Median, MinWith, MultiplyBy, Operation, OperationSeq, PixelOperation, PowerBy, SubtractBy, SubtractFrom, WeightedAverage}
 import rs.ac.bg.etf.ms1fp.nj203078m.model.traits.Sequence
 
 import java.awt.Color
@@ -20,8 +20,6 @@ import scala.swing.{Action, Alignment, BorderPanel, BoxPanel, Button, ColorChoos
 
 object Main extends SimpleSwingApplication {
 
-  import DialogType.DialogType
-
   val drawing: Drawing = new Drawing
 
   var value: Float = 0.0f
@@ -32,7 +30,7 @@ object Main extends SimpleSwingApplication {
 
   def D: Int = 2 * N + 1
 
-  var editingMode: DialogType = DialogType.Function
+  var editedSequence: Option[Sequence[Any]] = None
   var editingDialog: Option[SequenceDialog] = None
 
   var layerSelectionContains: Int => Boolean = _ => false
@@ -60,18 +58,31 @@ object Main extends SimpleSwingApplication {
     contents ++= components
   }
 
-  def executeOrAddOperation(operation: Operation): Unit = {
-    if (editingDialog.isDefined) {
-      editingMode match {
-        case DialogType.Function =>
-          operation match {
-            case pixelOp: PixelOperation => drawing.functionManager.last.operations.addOne(pixelOp)
-            case _ => Dialog.showMessage(top, "Functions can be consisted of pixel operations only!", "Warning!", Dialog.Message.Warning)
-          }
-        case DialogType.Operation => drawing.operationSeqManager.last.operations.addOne(operation)
+  def updateTableAndSelectRowAndColumn(table: Table, row: Int, column: Int): Unit = {
+    table.model.asInstanceOf[AbstractTableModel].fireTableDataChanged()
+    table.peer.setRowSelectionInterval(row, row)
+    table.peer.setColumnSelectionInterval(column, column)
+  }
+
+  def updateTableAndSelectRow(table: Table, row: Int): Unit = updateTableAndSelectRowAndColumn(table, row, 1)
+
+  def executeOrAddOperation(operation: Operation): Unit = editedSequence match {
+    case Some(sequence) =>
+      // Pattern matching does not work because of covariance issues. I tried to make it work by adding +T in
+      // Sequence[T] which failed and I eventually gave up.
+      //
+      if (sequence.isInstanceOf[Function]) {
+        val fn: Function = sequence.asInstanceOf[Function]
+        operation match {
+          case pixelOp: PixelOperation => fn.operations.addOne(pixelOp)
+          case _ => Dialog.showMessage(top, "Functions can be consisted of pixel operations only!", "Warning!", Dialog.Message.Warning)
+        }
+      } else if (sequence.isInstanceOf[OperationSeq]) {
+        val opSeq: OperationSeq = sequence.asInstanceOf[OperationSeq]
+        opSeq.operations.addOne(operation)
       }
       editingDialog.get.updateTable()
-    } else drawing.selectionManager.execute(layerSelectionContains, operation)
+    case None => drawing.selectionManager.execute(layerSelectionContains, operation)
   }
 
   val toggleableButtons: ArrayBuffer[Button] = new ArrayBuffer[Button]()
@@ -79,6 +90,15 @@ object Main extends SimpleSwingApplication {
   def toggleButtons(): Unit = {
     for (btn <- toggleableButtons)
       btn.enabled = !btn.enabled
+  }
+
+  def showSequenceDialog(table: Table): Unit = {
+    editingDialog = Some(new SequenceDialog(
+      top,
+      editedSequence.get,
+      true,
+      _ => stopEditing(table)))
+    editingDialog.get.visible = true
   }
 
   def stopEditing(updateTable: Table): Unit = {
@@ -342,7 +362,6 @@ object Main extends SimpleSwingApplication {
             case e: MouseClicked => if (e.source == this && e.modifiers == Key.Modifier.Control && selection.rows.size > 0)
               new SequenceDialog(
                 top,
-                DialogType.Function,
                 drawing.functionManager(peer.getSelectedRow).asInstanceOf[Sequence[Any]]
               ).visible = true
           }
@@ -358,21 +377,10 @@ object Main extends SimpleSwingApplication {
 
         val btnAdd = new Button(Action("Add") {
           drawing.functionManager.addFunction()
-          table.model.asInstanceOf[AbstractTableModel].fireTableRowsInserted(
-            drawing.functionManager.count - 1,
-            drawing.functionManager.count - 1
-          )
-          table.peer.setRowSelectionInterval(drawing.functionManager.count - 1, drawing.functionManager.count - 1)
-          table.peer.setColumnSelectionInterval(0, 0)
+          updateTableAndSelectRowAndColumn(table, drawing.functionManager.count - 1, 0)
           toggleButtons()
-          editingMode = DialogType.Function
-          editingDialog = Some(new SequenceDialog(
-            top,
-            DialogType.Function,
-            drawing.functionManager.last.asInstanceOf[Sequence[Any]],
-            true,
-            _ => stopEditing(table)))
-          editingDialog.get.visible = true
+          editedSequence = Some(drawing.functionManager.last.asInstanceOf[Sequence[Any]])
+          showSequenceDialog(table)
         })
         toggleableButtons.addOne(btnAdd)
 
@@ -436,7 +444,7 @@ object Main extends SimpleSwingApplication {
           xLayoutAlignment = java.awt.Component.CENTER_ALIGNMENT
           contents += new Button(Action("Median")(executeOrAddOperation(Median(N))))
           contents += new Button(Action("Weighted average") {
-            if (editingDialog.isDefined && editingMode == DialogType.Function)
+            if (editedSequence.isDefined && editedSequence.get.isInstanceOf[Function])
               Dialog.showMessage(top, "Functions can be consisted of pixel operations only!", "Warning!", Dialog.Message.Warning)
             else {
               if (txtWeightMatrix.text.matches(".*[a-zA-Z]+.*"))
@@ -495,7 +503,6 @@ object Main extends SimpleSwingApplication {
             case e: MouseClicked => if (e.source == this && e.modifiers == Key.Modifier.Control && selection.rows.size > 0)
               new SequenceDialog(
                 top,
-                DialogType.Operation,
                 drawing.operationSeqManager(peer.getSelectedRow).asInstanceOf[Sequence[Any]]
               ).visible = true
           }
@@ -511,21 +518,10 @@ object Main extends SimpleSwingApplication {
 
         val btnAdd = new Button(Action("Add") {
           drawing.operationSeqManager.addOperationSeq()
-          table.model.asInstanceOf[AbstractTableModel].fireTableRowsInserted(
-            drawing.operationSeqManager.count - 1,
-            drawing.operationSeqManager.count - 1
-          )
-          table.peer.setRowSelectionInterval(drawing.operationSeqManager.count - 1, drawing.operationSeqManager.count - 1)
-          table.peer.setColumnSelectionInterval(0, 0)
+          updateTableAndSelectRowAndColumn(table, drawing.operationSeqManager.count - 1, 0)
           toggleButtons()
-          editingMode = DialogType.Operation
-          editingDialog = Some(new SequenceDialog(
-            top,
-            DialogType.Operation,
-            drawing.operationSeqManager.last.asInstanceOf[Sequence[Any]],
-            true,
-            _ => stopEditing(table)))
-          editingDialog.get.visible = true
+          editedSequence = Some(drawing.operationSeqManager.last.asInstanceOf[Sequence[Any]])
+          showSequenceDialog(table)
         })
         toggleableButtons.addOne(btnAdd)
 
@@ -590,7 +586,6 @@ object Main extends SimpleSwingApplication {
             case e: MouseClicked => if (e.source == this && e.modifiers == Key.Modifier.Control && selection.rows.size > 0)
               new SequenceDialog(
                 top,
-                DialogType.Selection,
                 drawing.selectionManager(peer.getSelectedRow).asInstanceOf[Sequence[Any]]
               ).visible = true
           }
@@ -606,21 +601,10 @@ object Main extends SimpleSwingApplication {
 
         val btnAdd = new Button(Action("Add") {
           drawing.selectionManager.addSelection()
-          table.model.asInstanceOf[AbstractTableModel].fireTableRowsInserted(
-            drawing.selectionManager.count - 1,
-            drawing.selectionManager.count - 1
-          )
-          table.peer.setRowSelectionInterval(drawing.selectionManager.count - 1, drawing.selectionManager.count - 1)
-          table.peer.setColumnSelectionInterval(0, 0)
+          updateTableAndSelectRowAndColumn(table, drawing.selectionManager.count - 1,0)
           toggleButtons()
-          editingMode = DialogType.Selection
-          editingDialog = Some(new SequenceDialog(
-            top,
-            DialogType.Selection,
-            drawing.selectionManager.last.asInstanceOf[Sequence[Any]],
-            true,
-            _ => stopEditing(table)))
-          editingDialog.get.visible = true
+          editedSequence = Some(drawing.selectionManager.last.asInstanceOf[Sequence[Any]])
+          showSequenceDialog(table)
         })
         toggleableButtons.addOne(btnAdd)
 
@@ -717,9 +701,7 @@ object Main extends SimpleSwingApplication {
           if (table.selection.rows.size == 1) {
             val selectedRow = table.peer.getSelectedRow
             drawing.layerManager.duplicateLayer(selectedRow)
-            table.model.asInstanceOf[AbstractTableModel].fireTableRowsInserted(selectedRow, selectedRow)
-            table.peer.setRowSelectionInterval(selectedRow, selectedRow)
-            table.peer.setColumnSelectionInterval(1, 1)
+            updateTableAndSelectRow(table, selectedRow)
           }
         }) {
           enabled = false
@@ -730,14 +712,10 @@ object Main extends SimpleSwingApplication {
           if (table.selection.rows.size == 1) {
             val selectedRow = table.peer.getSelectedRow
             drawing.layerManager.addLayer(selectedRow)
-            table.model.asInstanceOf[AbstractTableModel].fireTableRowsInserted(selectedRow, selectedRow)
-            table.peer.setRowSelectionInterval(selectedRow, selectedRow)
-            table.peer.setColumnSelectionInterval(1, 1)
+            updateTableAndSelectRow(table, selectedRow)
           } else {
             drawing.layerManager.addLayer()
-            table.model.asInstanceOf[AbstractTableModel].fireTableRowsInserted(0, 0)
-            table.peer.setRowSelectionInterval(0, 0)
-            table.peer.setColumnSelectionInterval(1, 1)
+            updateTableAndSelectRow(table, 0)
           }
         })
         toggleableButtons.addOne(btnAdd)
@@ -745,9 +723,7 @@ object Main extends SimpleSwingApplication {
         val btnRemove: Button = new Button(Action("Remove") {
           if (table.selection.rows.size > 0) {
             drawing.layerManager.removeLayers(table.selection.rows.contains)
-            table.model.asInstanceOf[AbstractTableModel].fireTableDataChanged()
-            table.peer.setRowSelectionInterval(0, 0)
-            table.peer.setColumnSelectionInterval(1, 1)
+            updateTableAndSelectRow(table, 0)
             drawing.render()
           }
         }) {

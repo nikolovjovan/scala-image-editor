@@ -1,17 +1,14 @@
 package rs.ac.bg.etf.ms1fp.nj203078m.gui
 
 import rs.ac.bg.etf.ms1fp.nj203078m.gui.Main.{createHorizontalBoxPanel, createTableScrollPane}
+import rs.ac.bg.etf.ms1fp.nj203078m.model.Selection
+import rs.ac.bg.etf.ms1fp.nj203078m.model.operation.{Function, OperationSeq}
 import rs.ac.bg.etf.ms1fp.nj203078m.model.traits.Sequence
 
 import javax.swing.table.AbstractTableModel
 import scala.swing.Swing.EmptyBorder
 import scala.swing.event.{Key, KeyPressed, MouseClicked, TableRowsSelected, WindowClosing}
 import scala.swing.{Action, BoxPanel, Button, Dialog, Dimension, Orientation, Table, TextField, Window}
-
-object DialogType extends Enumeration {
-  type DialogType = Value
-  val Function, Operation, Selection = Value
-}
 
 class SequenceDialog private (owner: Window) extends Dialog (owner) {
   var name: String = ""
@@ -20,13 +17,18 @@ class SequenceDialog private (owner: Window) extends Dialog (owner) {
 
   var table: Option[Table] = None
 
-  def updateTitle(dialogType: DialogType.DialogType, name: String): Unit = {
-    title = dialogType match {
-      case DialogType.Function => "Function: \"" + name + "\""
-      case DialogType.Operation => "Operation: \"" + name + "\""
-      case DialogType.Selection => "Selection: \"" + name + "\""
-    }
-  }
+  def updateTitle(sequence: Sequence[Any], name: String): Unit = title =
+    // Pattern matching does not work because of covariance issues. I tried to make it work by adding +T in
+    // Sequence[T] which failed and I eventually gave up.
+    //
+    if (sequence.isInstanceOf[Selection])
+      "Selection: \"" + name + "\""
+    else if (sequence.isInstanceOf[Function])
+      "Function: \"" + name + "\""
+    else if (sequence.isInstanceOf[OperationSeq])
+      "Operation sequence: \"" + name + "\""
+    else
+      "Unknown sequence: \"" + name + "\""
 
   def updateTable(): Unit = {
     if (table.isDefined)
@@ -34,14 +36,17 @@ class SequenceDialog private (owner: Window) extends Dialog (owner) {
   }
 
   def this(owner: Window,
-           dialogType: DialogType.DialogType,
            sequence: Sequence[Any],
            editing: Boolean = false,
            stopEditing: Unit => Unit = null) {
     this(owner)
 
+    println(sequence.isInstanceOf[Selection])
+    println(sequence.isInstanceOf[Function])
+    println(sequence.isInstanceOf[OperationSeq])
+
     name = sequence.name
-    updateTitle(dialogType, name)
+    updateTitle(sequence, name)
 
     var txtName: Option[TextField] = None
 
@@ -56,7 +61,7 @@ class SequenceDialog private (owner: Window) extends Dialog (owner) {
           if (e.key == Key.Enter) {
             name = txtName.get.text
             sequence.name = name
-            updateTitle(dialogType, name)
+            updateTitle(sequence, name)
           } else if (e.key == Key.Escape)
             txtName.get.text = name
         }
