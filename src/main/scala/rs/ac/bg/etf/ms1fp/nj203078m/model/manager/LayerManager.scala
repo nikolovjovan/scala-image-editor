@@ -3,11 +3,15 @@ package rs.ac.bg.etf.ms1fp.nj203078m.model.manager
 import rs.ac.bg.etf.ms1fp.nj203078m.model.{Image, Layer, Rect}
 
 import scala.annotation.tailrec
+import scala.collection.mutable.ArrayBuffer
 import scala.swing.{Dimension, Point}
 
 class LayerManager extends Manager[Layer]("Layer", name => new Layer(name), true) {
   var output: Image = Image.Empty
   var outputSize: Dimension = new Dimension
+
+  var isLayerVisible: Int => Boolean = z => elements(z).visible
+  var getLayerAlpha: Int => Float = z => elements(z).alpha
 
   def getLayerAt(point: Point): Option[Layer] = {
     class BreakLoop extends Exception
@@ -17,7 +21,8 @@ class LayerManager extends Manager[Layer]("Layer", name => new Layer(name), true
     else {
       var result: Option[Layer] = None
       try {
-        for (layer <- elements if layer.visible && layer.alpha > 0.0f) {
+        for (z <- elements.indices if isLayerVisible(z) && getLayerAlpha(z) > 0.0f) {
+          val layer: Layer = elements(z)
           val xrel: Int = point.x - layer.x
           val yrel: Int = point.y - layer.y
           if (xrel >= 0 && xrel < layer.width &&
@@ -41,12 +46,12 @@ class LayerManager extends Manager[Layer]("Layer", name => new Layer(name), true
     @tailrec
     def doRender(x: Int, y: Int, z: Int = 0): Unit = {
       if (z < count && output(x)(y).alpha < 1.0f) {
-        if (elements(z).visible && elements(z).alpha > 0) {
+        if (isLayerVisible(z) && getLayerAlpha(z) > 0) {
           val xrel: Int = output.x + x - elements(z).x
           val yrel: Int = output.y + y - elements(z).y
           if (xrel >= 0 && xrel < elements(z).width &&
               yrel >= 0 && yrel < elements(z).height)
-            output(x)(y) = output(x)(y) over (elements(z).output(xrel)(yrel) withLayerAlpha elements(z).alpha)
+            output(x)(y) = output(x)(y) over (elements(z).output(xrel)(yrel) withLayerAlpha getLayerAlpha(z))
         }
         doRender(x, y, z + 1)
       }
@@ -54,12 +59,12 @@ class LayerManager extends Manager[Layer]("Layer", name => new Layer(name), true
 
     // Render only visible layers -> merge all layer images to one with Z-Buffer.
     //
-    for (layer <- elements if layer.visible && layer.alpha > 0)
-      layer.render()
+    for (z <- elements.indices if isLayerVisible(z) && getLayerAlpha(z) > 0.0f)
+      elements(z).render()
 
     if (count == 1) {
-      if (elements(0).visible && elements(0).alpha > 0.0f)
-        output = elements(0).output withLayerAlpha elements(0).alpha
+      if (isLayerVisible(0) && getLayerAlpha(0) > 0.0f)
+        output = elements(0).output withLayerAlpha getLayerAlpha(0)
       else
         output = Image.Empty
       outputSize.width = elements(0).x + elements(0).width
@@ -67,15 +72,15 @@ class LayerManager extends Manager[Layer]("Layer", name => new Layer(name), true
     } else {
       val sizeRect: Rect = new Rect
       val rect: Rect = new Rect
-      for (layer <- elements) {
+      for (z <- elements.indices) {
         // "rect" is responsible for actual output size, this image will be converted into BufferedImage for drawing.
         //
-        if (layer.visible && layer.alpha > 0 && layer.output.width > 0 && layer.output.height > 0)
-          Image.updateImageRect(layer.output, rect)
+        if (isLayerVisible(z) && getLayerAlpha(z) > 0 && elements(z).output.width > 0 && elements(z).output.height > 0)
+          Image.updateImageRect(elements(z).output, rect)
 
         // "sizeRect" is responsible for drawing a white background because image (with all hidden layers) is this size.
         //
-        Image.updateImageRect(layer.output, sizeRect)
+        Image.updateImageRect(elements(z).output, sizeRect)
       }
       if (rect.right > 0 && rect.bottom > 0) {
         output = new Image(rect.width, rect.height, rect.x, rect.y)
@@ -90,6 +95,8 @@ class LayerManager extends Manager[Layer]("Layer", name => new Layer(name), true
     output
   }
 
+  def layers: ArrayBuffer[Layer] = elements
+  
   def duplicateLayer(position: Int): Unit = elements.insert(position, new Layer(elements(position)))
   def addLayer(position: Int = 0): Unit = super.addElement(position)
   def removeLayers(selectionContains: Int => Boolean): Unit = super.removeElements(selectionContains)

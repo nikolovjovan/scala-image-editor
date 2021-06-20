@@ -41,6 +41,13 @@ object Main extends SimpleSwingApplication {
       continuousLayout = true
     }
 
+  def createVerticalSplitPane(top: Component, bottom: Component): SplitPane =
+    new SplitPane(Orientation.Vertical, top, bottom) {
+      oneTouchExpandable = true
+      continuousLayout = true
+      resizeWeight = 1
+    }
+
   def createTableScrollPane(table: Table): ScrollPane = new ScrollPane(table) {
     xLayoutAlignment = java.awt.Component.CENTER_ALIGNMENT
     minimumSize = new Dimension(80, 100)
@@ -142,6 +149,12 @@ object Main extends SimpleSwingApplication {
     chooser
   }
 
+  def createImageFileChooser(): FileChooser = {
+    val chooser = createFileChooser()
+    chooser.fileFilter = new FileNameExtensionFilter("Image files (*.png, *.jpg, *.jpeg)", "png", "jpg", "jpeg")
+    chooser
+  }
+
   def createProjectFileChooser(): FileChooser = {
     val chooser = createFileChooser()
     chooser.fileFilter = new FileNameExtensionFilter("Scala Image Editor Project Files (*.siep)", "siep")
@@ -205,6 +218,7 @@ object Main extends SimpleSwingApplication {
   def exportProject(): Unit = {
     // TODO: Show export dialog (create a custom class with preview)
     // Find a good way to separate layer visibility and alpha in order to prevent changing actual values
+    new ExportImageDialog(top, drawing.layerManager).visible = true
   }
 
   override def top: Frame = frame
@@ -733,8 +747,7 @@ object Main extends SimpleSwingApplication {
 
         val btnLoad: Button = new Button(Action("Load") {
           if (table.selection.rows.size == 1) {
-            val chooser = createFileChooser()
-            chooser.fileFilter = new FileNameExtensionFilter("Image files (*.png, *.jpg, *.jpeg)", "png", "jpg", "jpeg")
+            val chooser = createImageFileChooser()
             if (chooser.showOpenDialog(this) == FileChooser.Result.Approve) {
               drawing.layerManager(table.selection.rows.leadIndex).loadImage(chooser.selectedFile.getAbsolutePath)
               drawing.render()
@@ -750,11 +763,7 @@ object Main extends SimpleSwingApplication {
 
       val sideView: SplitPane = createHorizontalSplitPane(tpFFO, createHorizontalSplitPane(selections, layers))
 
-      val mainView: SplitPane = new SplitPane(Orientation.Vertical, drawingView, sideView) {
-        oneTouchExpandable = true
-        continuousLayout = true
-        resizeWeight = 1
-      }
+      val mainView: SplitPane = createVerticalSplitPane(drawingView, sideView)
 
       val center: SplitPane = createHorizontalSplitPane(toolsView, mainView)
 
