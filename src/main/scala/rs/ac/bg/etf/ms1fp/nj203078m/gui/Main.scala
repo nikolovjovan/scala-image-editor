@@ -56,7 +56,10 @@ object Main extends SimpleSwingApplication {
     horizontalScrollBarPolicy = ScrollPane.BarPolicy.Never
     listenTo(mouse.clicks)
     reactions += {
-      case _: MouseClicked => table.peer.clearSelection()
+      case _: MouseClicked =>
+        table.peer.clearSelection()
+        if (editedSequence.isEmpty)
+          drawing.stopHighlightingSelection()
     }
   }
 
@@ -109,6 +112,7 @@ object Main extends SimpleSwingApplication {
   }
 
   def stopEditing(updateTable: Table): Unit = {
+    editedSequence = None
     editingDialog = None
     toggleButtons()
     updateTable.model.asInstanceOf[AbstractTableModel].fireTableDataChanged()
@@ -194,23 +198,27 @@ object Main extends SimpleSwingApplication {
   def loadProject(): Unit = {
     val chooser = createProjectFileChooser()
     if (chooser.showOpenDialog(top) == FileChooser.Result.Approve) {
-      val ois: ObjectInputStream = new ObjectInputStream(new FileInputStream(chooser.selectedFile.getAbsolutePath)){
-        // ref: https://stackoverflow.com/questions/16386252/scala-deserialization-class-not-found
-        //
-        override def resolveClass(desc: java.io.ObjectStreamClass): Class[_] = {
-          try { Class.forName(desc.getName, false, getClass.getClassLoader) }
-          catch { case _: ClassNotFoundException => super.resolveClass(desc) }
+      try {
+        val ois: ObjectInputStream = new ObjectInputStream(new FileInputStream(chooser.selectedFile.getAbsolutePath)){
+          // ref: https://stackoverflow.com/questions/16386252/scala-deserialization-class-not-found
+          //
+          override def resolveClass(desc: java.io.ObjectStreamClass): Class[_] = {
+            try { Class.forName(desc.getName, false, getClass.getClassLoader) }
+            catch { case _: ClassNotFoundException => super.resolveClass(desc) }
+          }
         }
+        drawing.layerManager = ois.readObject().asInstanceOf[LayerManager]
+        drawing.selectionManager = ois.readObject().asInstanceOf[SelectionManager]
+        // Restore broken references. See comment above in saveProject function.
+        //
+        drawing.selectionManager.renderDrawing = drawing.render
+        drawing.selectionManager.layerManager = drawing.layerManager
+        drawing.functionManager = ois.readObject().asInstanceOf[FunctionManager]
+        drawing.operationSeqManager = ois.readObject().asInstanceOf[OperationSeqManager]
+        ois.close()
+      } catch {
+        case e: Exception => Dialog.showMessage(top, "Failed to load project! It is very likely the project was created in an older version of the program. Exception: " + e, "Error!", Dialog.Message.Error)
       }
-      drawing.layerManager = ois.readObject().asInstanceOf[LayerManager]
-      drawing.selectionManager = ois.readObject().asInstanceOf[SelectionManager]
-      // Restore broken references. See comment above in saveProject function.
-      //
-      drawing.selectionManager.renderDrawing = drawing.render
-      drawing.selectionManager.layerManager = drawing.layerManager
-      drawing.functionManager = ois.readObject().asInstanceOf[FunctionManager]
-      drawing.operationSeqManager = ois.readObject().asInstanceOf[OperationSeqManager]
-      ois.close()
       updateUI()
     }
   }
@@ -597,18 +605,23 @@ object Main extends SimpleSwingApplication {
                 drawing.selectionManager.activeSelection =
                   if (selection.rows.size == 1) drawing.selectionManager(peer.getSelectedRow) else Selection.Everything
             }
-            case e: MouseClicked => if (e.source == this && e.modifiers == Key.Modifier.Control && selection.rows.size > 0)
-              new SequenceDialog(
-                top,
-                drawing.selectionManager(peer.getSelectedRow).asInstanceOf[Sequence[Any]]
-              ).visible = true
+            case e: MouseClicked =>
+              if (e.source == this && e.modifiers == Key.Modifier.Control && selection.rows.size > 0)
+                new SequenceDialog(
+                  top,
+                  drawing.selectionManager(peer.getSelectedRow).asInstanceOf[Sequence[Any]]
+                ).visible = true
+              drawing.highlightSelection(drawing.selectionManager.activeSelection)
           }
         }
         tablesToUpdate += table
 
         listenTo(mouse.clicks)
         reactions += {
-          case _: MouseClicked => table.peer.clearSelection()
+          case _: MouseClicked =>
+            table.peer.clearSelection()
+            if (editedSequence.isEmpty)
+              drawing.stopHighlightingSelection()
         }
 
         contents += createTableScrollPane(table)
@@ -619,12 +632,14 @@ object Main extends SimpleSwingApplication {
           toggleButtons()
           editedSequence = Some(drawing.selectionManager.last.asInstanceOf[Sequence[Any]])
           showSequenceDialog(table)
+          drawing.editSelection(drawing.selectionManager.last)
         })
         toggleableButtons.addOne(btnAdd)
 
         val btnRemove: Button = new Button(Action("Remove") {
           if (table.selection.rows.size > 0) {
             drawing.selectionManager.removeSelections(table.selection.rows.contains)
+            drawing.stopHighlightingSelection()
             table.model.asInstanceOf[AbstractTableModel].fireTableDataChanged()
             drawing.render()
           }

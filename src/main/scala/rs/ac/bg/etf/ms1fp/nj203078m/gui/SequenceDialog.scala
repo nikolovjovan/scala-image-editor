@@ -114,12 +114,16 @@ class SequenceDialog (owner: Window, sequence: Sequence[Any], editing: Boolean =
         sequence.name = txtName.get.text
         close()
         stopEditing()
+        if (sequence.isInstanceOf[Selection])
+          Main.drawing.stopEditingSelection()
       })
 
       contents += createHorizontalBoxPanel(Seq(btnRemove.get, btnSave))
     } else {
       contents += new Button(Action("OK") {
         close()
+        if (sequence.isInstanceOf[Selection])
+          Main.drawing.stopHighlightingSelection()
       })
     }
   }
@@ -132,4 +136,12 @@ class SequenceDialog (owner: Window, sequence: Sequence[Any], editing: Boolean =
   peer.setAlwaysOnTop(true)
 
   minimumSize = new Dimension(300, 300)
+
+  reactions += {
+    case _: WindowClosing =>
+      if (sequence.isInstanceOf[Selection]) {
+        if (editing) Main.drawing.stopEditingSelection()
+        else Main.drawing.stopHighlightingSelection()
+      }
+  }
 }

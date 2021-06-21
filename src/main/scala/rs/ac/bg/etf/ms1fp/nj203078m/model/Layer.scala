@@ -180,7 +180,8 @@ class Layer (var name: String, var alpha: Float = 1.0f) extends ElementBase {
 
     // Try to reuse previous sublayer if location and size matches!
     //
-    if (images.last.selectionId == selection.id &&
+    if (images.nonEmpty &&
+        images.last.selectionId == selection.id &&
         images.last.x == imageRect.x &&
         images.last.y == imageRect.y &&
         images.last.width == imageRect.width &&
@@ -198,6 +199,12 @@ class Layer (var name: String, var alpha: Float = 1.0f) extends ElementBase {
         case seq: OperationSeq => images += executeSeq(rects, output, out, seq)
         case op: Operation => images += executeOp(rects, output, out, op)
       }
+      // Add previous output because it won't be rendered.
+      //
+      for (x <- output.x until output.x + output.width)
+        for (y <- output.y until output.y + output.height)
+          if (output(x - output.x)(y - output.y).alpha > 0.0f)
+            out(x - out.x)(y - out.y) = out(x - out.x)(y - out.y) over output(x - output.x)(y - output.y)
     }
 
     needsRender = true

@@ -19,13 +19,15 @@ class ImagePreview (var layerManager: LayerManager) extends Component {
     repaint()
   }
 
+  def getViewSize: Dimension =
+    if (peer.getParent != null && peer.getParent.isInstanceOf[JViewport])
+      peer.getParent.asInstanceOf[JViewport].getExtentSize
+    else
+      new Dimension(1, 1)
+
   override def paintComponent(g: Graphics2D): Unit = {
     super.paintComponent(g)
-    val viewSize =
-      if (peer.getParent != null && peer.getParent.isInstanceOf[JViewport])
-        peer.getParent.asInstanceOf[JViewport].getExtentSize
-      else
-        new Dimension
+    val viewSize = getViewSize
     var prefSize = new Dimension(1, 1)
     if (layerManager.output.isEmpty && layerManager.outputSize.width == 0 && layerManager.outputSize.height == 0) {
       g.setColor(background)
