@@ -9,7 +9,7 @@ import java.awt.Color
 import java.io.{File, FileInputStream, FileOutputStream, ObjectInputStream, ObjectOutputStream}
 import java.util.Scanner
 import javax.swing.event.ChangeEvent
-import javax.swing.{JDialog, JLabel, JOptionPane, JSpinner, ListSelectionModel, SpinnerNumberModel}
+import javax.swing.{JDialog, JLabel, JOptionPane, JSpinner, ListSelectionModel, SpinnerNumberModel, SwingUtilities, WindowConstants}
 import javax.swing.filechooser.FileNameExtensionFilter
 import javax.swing.table.AbstractTableModel
 import scala.collection.mutable.ArrayBuffer
@@ -102,6 +102,29 @@ object Main extends SimpleSwingApplication {
       btn.enabled = !btn.enabled
   }
 
+  def showMessageDialog(message: String, title: String): JDialog = {
+    val optionPane = new JOptionPane(
+      message,
+      JOptionPane.INFORMATION_MESSAGE,
+      JOptionPane.DEFAULT_OPTION,
+      null,
+      new Array[AnyRef](0),
+      null)
+    val dialog = new JDialog(top.peer, title)
+    dialog.setContentPane(optionPane)
+    dialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE)
+    dialog.pack()
+    top.peer.setEnabled(false)
+    dialog.setVisible(true)
+    dialog
+  }
+
+  def disposeMessageDialog(dialog: JDialog): Unit = {
+    dialog.setVisible(false)
+    dialog.dispose()
+    top.peer.setEnabled(true)
+  }
+
   def showSequenceDialog(table: Table): Unit = {
     editingDialog = Some(new SequenceDialog(
       top,
@@ -178,21 +201,26 @@ object Main extends SimpleSwingApplication {
       return
     if (!fileName.endsWith(".siep"))
       fileName += ".siep"
-    val oos: ObjectOutputStream = new ObjectOutputStream(new FileOutputStream(fileName))
-    oos.writeObject(drawing.layerManager)
-    // Writing SelectionManager fails because Drawing.render function is referenced so Drawing needs serialization
-    // which is not necessary for saving project state.
-    // In order to bypass this problem, before writing object remove references to Drawing.render and LayerManager
-    // and after writing restore them. (This means that on project load they need to be restored too!)
-    //
-    drawing.selectionManager.renderDrawing = null
-    drawing.selectionManager.layerManager = null
-    oos.writeObject(drawing.selectionManager)
-    drawing.selectionManager.renderDrawing = drawing.render
-    drawing.selectionManager.layerManager = drawing.layerManager
-    oos.writeObject(drawing.functionManager)
-    oos.writeObject(drawing.operationSeqManager)
-    oos.close()
+    val dialog = showMessageDialog("Please wait until project is saved...", "Saving project...")
+    SwingUtilities.invokeLater(() => {
+      val oos: ObjectOutputStream = new ObjectOutputStream(new FileOutputStream(fileName))
+      oos.writeObject(drawing.layerManager)
+      // Writing SelectionManager fails because Drawing.render function is referenced so Drawing needs serialization
+      // which is not necessary for saving project state.
+      // In order to bypass this problem, before writing object remove references to Drawing.render and LayerManager
+      // and after writing restore them. (This means that on project load they need to be restored too!)
+      //
+      drawing.selectionManager.renderDrawing = null
+      drawing.selectionManager.layerManager = null
+      oos.writeObject(drawing.selectionManager)
+      drawing.selectionManager.renderDrawing = drawing.render
+      drawing.selectionManager.layerManager = drawing.layerManager
+      oos.writeObject(drawing.functionManager)
+      oos.writeObject(drawing.operationSeqManager)
+      oos.close()
+      disposeMessageDialog(dialog)
+      Dialog.showMessage(top, "Project successfully saved!", "Project saved!")
+    })
   }
 
   def loadProject(): Unit = {
@@ -207,24 +235,28 @@ object Main extends SimpleSwingApplication {
             catch { case _: ClassNotFoundException => super.resolveClass(desc) }
           }
         }
-        drawing.layerManager = ois.readObject().asInstanceOf[LayerManager]
-        drawing.selectionManager = ois.readObject().asInstanceOf[SelectionManager]
-        // Restore broken references. See comment above in saveProject function.
-        //
-        drawing.selectionManager.renderDrawing = drawing.render
-        drawing.selectionManager.layerManager = drawing.layerManager
-        drawing.functionManager = ois.readObject().asInstanceOf[FunctionManager]
-        drawing.operationSeqManager = ois.readObject().asInstanceOf[OperationSeqManager]
-        ois.close()
+        val dialog = showMessageDialog("Please wait until project loads...", "Loading project...")
+        SwingUtilities.invokeLater(() => {
+          drawing.layerManager = ois.readObject().asInstanceOf[LayerManager]
+          drawing.selectionManager = ois.readObject().asInstanceOf[SelectionManager]
+          // Restore broken references. See comment above in saveProject function.
+          //
+          drawing.selectionManager.renderDrawing = drawing.render
+          drawing.selectionManager.layerManager = drawing.layerManager
+          drawing.functionManager = ois.readObject().asInstanceOf[FunctionManager]
+          drawing.operationSeqManager = ois.readObject().asInstanceOf[OperationSeqManager]
+          ois.close()
+          disposeMessageDialog(dialog)
+          updateUI()
+          Dialog.showMessage(top, "Project has successfully loaded!", "Project loaded!")
+        })
       } catch {
         case e: Exception => Dialog.showMessage(top, "Failed to load project! It is very likely the project was created in an older version of the program. Exception: " + e, "Error!", Dialog.Message.Error)
       }
-      updateUI()
     }
   }
 
   def exportProject(): Unit = {
-    // TODO: Show export dialog (create a custom class with preview)
     // Find a good way to separate layer visibility and alpha in order to prevent changing actual values
     new ExportImageDialog(top, drawing.layerManager).visible = true
   }

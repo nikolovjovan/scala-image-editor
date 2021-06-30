@@ -170,6 +170,7 @@ class ExportImageDialog (owner: Window, layerManager: LayerManager) extends Dial
                 new FileImageOutputStream(new File(exportPath)))
               close()
               restoreLayerAccessors()
+              Dialog.showMessage(this, "Image successfully exported!", "Export finished!")
             } catch {
               case ex: Exception => Dialog.showMessage(this, "Failed to export image. Error: " + ex, "Error!", Dialog.Message.Error)
             }
